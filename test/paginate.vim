@@ -18,7 +18,7 @@ def RunTests()
     var total_chunks = exists('b:chunk_lines') ? len(b:chunk_lines) : 0
     infra.ExpectTrue(total_chunks >= 12, 'Precondition: Test file generated ' .. total_chunks .. ' chunks (Requires >= 12)')
 
-    # TODO make sure 10000j jumps over to next chunk
+
     infra.LogHeader('Scrolling without losing any line')
 
     scroll.ScrollForward("j", (current) => current + 1)
@@ -36,6 +36,45 @@ def RunTests()
     scroll.ScrollBackwards("\<C-b>", (current) => current - winheight(0))
     scroll.ScrollBackwards("\<C-u>", (current) => current - winheight(0) / 2)
     scroll.ScrollBackwards("?Line\<CR>", (current) => current - 1)
+
+    infra.LogHeader('Boundary Seams')
+    for chunk_index in [0, 1, 2, 6, -3, -2, -1]
+        # Normalize negative indices (e.g., -2 becomes total_chunks - 2)
+        # then compute the exact seam line by summing all chunk sizes up to index `i`
+        var ii = chunk_index < 0 ? total_chunks + chunk_index : chunk_index
+        var seam_line = 0
+        for c in range(0, ii)
+            seam_line += b:chunk_lines[c]
+        endfor
+
+        if chunk_index != -1
+            feedkeys(seam_line - 2 .. "G", 'xt')
+            feedkeys("j", 'xt') | infra.AssertLocation(seam_line - 1, v:null, ii .. 'th chunk: j down before seam')
+            feedkeys("j", 'xt') | infra.AssertLocation(seam_line,     v:null, ii .. 'th chunk: j exact seam boundary')
+            feedkeys("j", 'xt') | infra.AssertLocation(seam_line + 1, v:null, ii .. 'th chunk: j down over seam (ShiftDown)')
+            feedkeys("k", 'xt') | infra.AssertLocation(seam_line,     v:null, ii .. 'th chunk: h up over seam (ShiftUp)')
+
+            feedkeys(seam_line - 5 .. "G", 'xt')
+            feedkeys("10j", 'xt') | infra.AssertLocation(seam_line,     v:null, ii .. 'th chunk: 10j over seam')
+            feedkeys("10k", 'xt') | infra.AssertLocation(seam_line - 5, v:null, ii .. 'th chunk: 10k back over seam')
+
+            feedkeys(seam_line - 10 .. "G", 'xt')
+            feedkeys("/Line " .. (seam_line + 2) .. "\<CR>", 'xt')
+                infra.AssertLocation(seam_line + 2, v:null, ii .. 'th chunk: forward search crossing seam')
+            feedkeys("?Line " .. (seam_line - 2) .. "\<CR>", 'xt')
+                infra.AssertLocation(seam_line - 2, v:null, ii .. 'th chunk: backward search crossing seam')
+        else
+            feedkeys(seam_line - 2 .. "G", 'xt')
+            feedkeys("j", 'xt') | infra.AssertLocation(seam_line - 1, v:null, ii .. 'th chunk: j down before seam')
+            feedkeys("j", 'xt') | infra.AssertLocation(seam_line,     v:null, ii .. 'th chunk: j exact seam boundary')
+            feedkeys("j", 'xt') | infra.AssertLocation(seam_line,     v:null, ii .. 'th chunk: j down against EOF')
+            feedkeys("k", 'xt') | infra.AssertLocation(seam_line - 1, v:null, ii .. 'th chunk: h up from EOF')
+
+            feedkeys(seam_line - 5 .. "G", 'xt')
+            feedkeys("10j", 'xt') | infra.AssertLocation(seam_line + 5, v:null, ii .. 'th chunk: 10j over seam into EOF')
+            feedkeys("10k", 'xt') | infra.AssertLocation(seam_line - 10, v:null, ii .. 'th chunk: 10k up from EOF')
+        endif
+    endfor
 
 
     infra.LogHeader('Absolute Jumps')
