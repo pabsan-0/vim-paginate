@@ -123,3 +123,21 @@ export def AssertText(expected: string, context: string)
     var actual = getline('.')
     ExpectMatch(expected, actual, context)
 enddef
+
+export def AssertCursorChunk(expected_chunk: number, step_msg: string)
+    # Compute the true absolute line the cursor is currently on
+    var current_real = b:pager_offset + line('.')
+
+    # Iterate through the chunk array to find which chunk owns this line
+    var accumulated = 0
+    var actual_chunk = len(b:chunk_lines) - 1
+    for idx in range(len(b:chunk_lines))
+        accumulated += b:chunk_lines[idx]
+        if current_real <= accumulated
+            actual_chunk = idx
+            break
+        endif
+    endfor
+
+    ExpectEqual(expected_chunk, actual_chunk, step_msg .. ' [Chunk Check]')
+enddef
