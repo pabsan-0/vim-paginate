@@ -178,13 +178,13 @@ enddef
 export def CheckBoundaries()
     var current_line = line('.')
     var total_lines = line('$')
+    var visual_margin = winheight(0) * 3
+    if visual_margin < 1 | visual_margin = 1 | endif
+    var margin = max([total_lines / 4, visual_margin])
 
-    var prev_thresh = 100000
-    var next_thresh = total_lines - 100000
-
-    if current_line < prev_thresh && b:current_chunk_prev_idx > 0
+    if current_line < margin && b:current_chunk_prev_idx >= 0
         ShiftUp()
-    elseif current_line > next_thresh && (b:current_chunk_next_idx) < len(b:chunk_lines)
+    elseif current_line > total_lines - margin + 1 && b:current_chunk_next_idx < len(b:chunk_lines)
         ShiftDown()
     endif
 enddef
@@ -212,6 +212,8 @@ def ShiftDown()
 
     b:pager_offset += lines_to_delete
     b:current_chunk_idx += 1
+    b:current_chunk_prev_idx += 1
+    b:current_chunk_next_idx += 1
 
     setlocal nomodifiable
 enddef
@@ -240,6 +242,8 @@ def ShiftUp()
     setpos('.', pos)
 
     b:current_chunk_idx -= 1
+    b:current_chunk_prev_idx -= 1
+    b:current_chunk_next_idx -= 1
     b:pager_offset -= lines_added
 
     setlocal nomodifiable
@@ -314,12 +318,16 @@ export def MoveUpDown(is_down: bool, count: number)
     # Translate the real target back to a local buffer line
     var buffer_target = target_real - b:pager_offset
 
-    # Check if that line is already sitting inside our loaded 3-chunk window
-    if buffer_target > 0 && buffer_target <= line('$')
+    # If moving outside of the current chunk, just use the safer GoToRealLine
+    # This was once implemented as moving outside of the current chunk view,
+    # but there is a pitfall on that as one may jump across 2 chunks near the
+    # top/bottom and do a single ShiftUp/ShiftDown.
+    if GetCurrentChunkBoundaries(current_real)[0] == GetCurrentChunkBoundaries(target_real)[0]
         # Safe! The text is already in RAM. Jump there natively.
         cursor(buffer_target, col('.'))
     else
         # Danger! The user is jumping out of the buffer. Force an absolute reload.
+        # Note this is slower
         GoToRealLine(target_real)
     endif
 enddef
@@ -656,14 +664,15 @@ enddef
 
 
 # Returns a list acting as a tuple: [start_line, end_line]
-export def GetCurrentChunkBoundaries(): list<number>
+export def GetCurrentChunkBoundaries(linenr: number = -1): list<number>
     if !exists('b:pager_offset') || !exists('b:chunk_lines')
         return [1, get(b:, 'pager_total_lines', line('$'))]
     endif
 
-    var current_abs_line = line('.') + b:pager_offset
+    var current_abs_line = linenr > 0 ? linenr : line('.') + b:pager_offset
     var cumulative_lines = 0
 
+    var chunk_index = 0
     for lines_in_chunk in b:chunk_lines
         var chunk_start = cumulative_lines + 1
         cumulative_lines += lines_in_chunk
@@ -671,24 +680,26 @@ export def GetCurrentChunkBoundaries(): list<number>
 
         # If the cursor falls within this mathematical window, return the tuple
         if current_abs_line >= chunk_start && current_abs_line <= chunk_end
-            return [chunk_start, chunk_end]
+            return [chunk_index, chunk_start, chunk_end]
         endif
+
+        chunk_index += 1
     endfor
 
     # Fallback if math fails or we are completely out of bounds
-    return [1, get(b:, 'pager_total_lines', line('$'))]
+    return [-1, 1, get(b:, 'pager_total_lines', line('$'))]
 enddef
 
 export def GetBoundaryStart(jump: bool = v:false): number
     var boundaries = GetCurrentChunkBoundaries()
-    var target_abs_line = boundaries[0]
+    var target_abs_line = boundaries[1]
     if jump | execute 'normal ' .. target_abs_line .. 'G' | endif
     return target_abs_line
 enddef
 
 export def GetBoundaryEnd(jump: bool = v:false): number
     var boundaries = GetCurrentChunkBoundaries()
-    var target_abs_line = boundaries[1]
+    var target_abs_line = boundaries[2]
     if jump | execute 'normal ' .. target_abs_line .. 'G' | endif
     return target_abs_line
 enddef

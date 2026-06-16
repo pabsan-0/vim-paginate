@@ -1,5 +1,7 @@
 vim9script
 
+g:pager_chunk_size = '300K'
+
 export var test_file = '/tmp/vim-paginate-test.log'
 export var total_lines = 60000
 export var test_report: list<string> = []
@@ -9,7 +11,6 @@ export var fail_count = 0
 var root_dir = fnamemodify(expand('<sfile>:p'), ':h:h')
 
 export def BeginSuite()
-    g:pager_chunk_size = '300K'
     execute 'set runtimepath^=' .. fnameescape(root_dir)
     filetype plugin on
     test_report = []
