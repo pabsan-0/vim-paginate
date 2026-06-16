@@ -294,8 +294,8 @@ export def GoToRealLine(count: any, record_jump: bool = v:true)
     cursor(target - b:pager_offset, 1)
 enddef
 
-# FIXME Really needed? This protects against large moves that may move out of
-# the buffer directly but can't really recall the edge case
+# This protects against large moves that may move out of the buffer directly
+# without allowing CheckBoundaries to catch up
 export def MoveUpDown(is_down: bool, count: number)
     if count == 0
         # No count provided, perform a standard single-line native movement

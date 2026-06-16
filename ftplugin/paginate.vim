@@ -25,6 +25,9 @@ command! -buffer -nargs=1 J call paginate.GoToRealLine(str2nr(<q-args>))
 command! -buffer -nargs=0 PagerInfo call paginate.ShowPagerInfo()
 command! -buffer -nargs=0 PagerQuit call paginate.QuitPager()
 
+nnoremap <buffer> <silent> j  <ScriptCmd>paginate.MoveUpDown(v:true, v:count)<CR>
+nnoremap <buffer> <silent> k  <ScriptCmd>paginate.MoveUpDown(v:false, v:count)<CR>
+
 nnoremap <buffer> <silent> gg <ScriptCmd>paginate.GoToRealLine(1)<CR>
 nnoremap <buffer> <silent> G  <ScriptCmd>paginate.GoToRealLine(v:count)<CR>
 nnoremap <buffer> <silent> /  <ScriptCmd>paginate.PromptSearch(v:true)<CR>

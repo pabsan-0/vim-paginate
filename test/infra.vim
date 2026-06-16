@@ -38,8 +38,8 @@ export def EndSuite()
     setlocal buftype=nofile bufhidden=wipe noswapfile
     setline(1, final_output)
 
-    syntax match TestPass /✅ \[PASS\]/
-    syntax match TestFail /❌ \[FAIL\]/
+    syntax match TestPass /\[PASS\]/
+    syntax match TestFail /\[FAIL\]/
     highlight TestPass ctermfg=green guifg=green
     highlight TestFail ctermfg=red guifg=red
 enddef
@@ -69,30 +69,30 @@ enddef
 
 export def ExpectEqual(expected: any, actual: any, context: string)
     if expected == actual
-        add(test_report, '✅ [PASS] ' .. context)
+        add(test_report, '[PASS] ' .. context)
         pass_count += 1
     else
-        add(test_report, '❌ [FAIL] ' .. context .. ' -> Expected: ' .. string(expected) .. ', Got: ' .. string(actual))
+        add(test_report, '[FAIL] ' .. context .. ' -> Expected: ' .. string(expected) .. ', Got: ' .. string(actual))
         fail_count += 1
     endif
 enddef
 
 export def ExpectMatch(pattern: string, actual: string, context: string)
     if actual =~ pattern
-        add(test_report, '✅ [PASS] ' .. context)
+        add(test_report, '[PASS] ' .. context)
         pass_count += 1
     else
-        add(test_report, "❌ [FAIL] " .. context .. " -> Pattern '" .. pattern .. "' not found in: '" .. actual .. "'")
+        add(test_report, "[FAIL] " .. context .. " -> Pattern '" .. pattern .. "' not found in: '" .. actual .. "'")
         fail_count += 1
     endif
 enddef
 
 export def ExpectFalse(condition: bool, context: string)
     if !condition
-        add(test_report, '✅ [PASS] ' .. context)
+        add(test_report, '[PASS] ' .. context)
         pass_count += 1
     else
-        add(test_report, '❌ [FAIL] ' .. context .. ' -> Expected False, but was True')
+        add(test_report, '[FAIL] ' .. context .. ' -> Expected False, but was True')
         fail_count += 1
     endif
 enddef
