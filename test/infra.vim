@@ -51,11 +51,11 @@ export def SetupTestFile()
         if i == 1
             add(lines, 'Line 1 - [EASTER_EGG_TOP]')
         elseif i == (total_lines / 4)
-            add(lines, 'Line 2500 - [MARK_TARGET]')
+            add(lines, 'Line ' .. i .. ' - [MARK_TARGET]')
         elseif i == (total_lines / 2)
-            add(lines, 'Line 7500 - [EASTER_EGG_MIDDLE]')
+            add(lines, 'Line ' .. i .. ' - [EASTER_EGG_MIDDLE]')
         elseif i == (total_lines - 1)
-            add(lines, 'Line 14999 - [EASTER_EGG_BOTTOM]')
+            add(lines, 'Line ' .. i .. ' - [EASTER_EGG_BOTTOM]')
         else
             add(lines, 'Line ' .. i .. ' - Standard filler data to bulk out the chunk size.')
         endif

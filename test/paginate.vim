@@ -141,6 +141,17 @@ def RunTests()
     infra.AssertLocation(3456, v:null, 'Post-init: Offset init retained line 3456')
 
 
+    infra.LogHeader('Marks')
+    feedkeys("1500G", 'xt')
+    feedkeys("ma", 'xt')     | infra.AssertLocation(1500, v:null, 'Setup: Placed mark "a" at line 1500')
+    feedkeys("12000G", 'xt') | infra.AssertLocation(12000, v:null, 'Moved to line 12000 (different chunk)')
+    feedkeys("'a", 'xt')     | infra.AssertLocation(1500, v:null, 'Line jump to local mark "a" across chunks')
+    feedkeys("3000G5lmb9000G", 'xt')
+    feedkeys("`b", 'xt')     | infra.AssertLocation(3000, v:null, 'Exact jump to local mark "b" across chunks')
+    feedkeys("''", 'xt')     | infra.AssertLocation(1, v:null, 'Jump to previous context line') # TODO
+    feedkeys("``", 'xt')     | infra.AssertLocation(1, v:null, 'Jump back to exact previous context') # TODO
+
+
     infra.LogHeader('Search engine')
     feedkeys("gg/EASTER_EGG_TOP\<CR>", 'xt')    | infra.AssertLocation(1, v:null, 'Native RAM Forward Search')
     feedkeys("gg/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(14999, v:null, 'Cross-Chunk Forward Search (Ripgrep)')
