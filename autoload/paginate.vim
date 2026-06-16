@@ -192,6 +192,10 @@ enddef
 def ShiftDown()
     setlocal modifiable
 
+    # Save absolute real line and column before ANY modification
+    var target_real = line('.') + b:pager_offset
+    var target_col = col('.')
+
     # Purge the first chunk from the top of the buffer
     var lines_to_delete = b:chunk_lines[b:current_chunk_idx]
     silent execute ':1,' .. lines_to_delete .. 'delete _'
@@ -205,21 +209,24 @@ def ShiftDown()
         endif
     endif
 
-    # Keep cursor in the proper line
-    var pos = getpos('.')
-    pos[1] -= lines_to_delete
-    setpos('.', pos)
-
+    # Update pager state
     b:pager_offset += lines_to_delete
     b:current_chunk_idx += 1
     b:current_chunk_prev_idx += 1
     b:current_chunk_next_idx += 1
+
+    # Restore cursor position
+    cursor(target_real - b:pager_offset, target_col)
 
     setlocal nomodifiable
 enddef
 
 def ShiftUp()
     setlocal modifiable
+
+    # Save absolute real line and column before ANY modification
+    var target_real = line('.') + b:pager_offset
+    var target_col = col('.')
 
     # Purge the last chunk from the bottom of the buffer
     var bottom_chunk_lines = b:chunk_lines[b:current_chunk_idx + 2]
@@ -228,23 +235,23 @@ def ShiftUp()
 
     # Add the prev chunk at the top of the buffer
     var prev_idx = b:current_chunk_prev_idx
+    var lines_added = 0
     if prev_idx >= 0
         var chunk_file = b:pager_prefix .. printf('%05d', prev_idx)
         if filereadable(chunk_file)
             silent execute ':0read ' .. fnameescape(chunk_file)
         endif
+        lines_added = b:chunk_lines[prev_idx]
     endif
-    var lines_added = prev_idx >= 0 ? b:chunk_lines[prev_idx] : 0
 
-    # Keep cursor in the proper line
-    var pos = getpos('.')
-    pos[1] += lines_added
-    setpos('.', pos)
-
+    # Update pager state
     b:current_chunk_idx -= 1
     b:current_chunk_prev_idx -= 1
     b:current_chunk_next_idx -= 1
     b:pager_offset -= lines_added
+
+    # Restore cursor position
+    cursor(target_real - b:pager_offset, target_col)
 
     setlocal nomodifiable
 enddef
@@ -304,6 +311,7 @@ export def MoveUpDown(is_down: bool, count: number)
     if count == 0
         # No count provided, perform a standard single-line native movement
         execute 'normal! ' .. (is_down ? 'j' : 'k')
+        CheckBoundaries()
         return
     endif
 
