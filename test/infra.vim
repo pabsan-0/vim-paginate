@@ -1,7 +1,7 @@
 vim9script
 
 export var test_file = '/tmp/vim-paginate-test.log'
-export var total_lines = 15000
+export var total_lines = 60000
 export var test_report: list<string> = []
 export var pass_count = 0
 export var fail_count = 0
@@ -44,16 +44,16 @@ export def EndSuite()
     highlight TestFail ctermfg=red guifg=red
 enddef
 
-def SetupTestFile()
+export def SetupTestFile()
     var lines = []
     for i in range(1, total_lines)
         if i == 1
             add(lines, 'Line 1 - [EASTER_EGG_TOP]')
-        elseif i == 2500
+        elseif i == (total_lines / 4)
             add(lines, 'Line 2500 - [MARK_TARGET]')
-        elseif i == 7500
+        elseif i == (total_lines / 2)
             add(lines, 'Line 7500 - [EASTER_EGG_MIDDLE]')
-        elseif i == 14999
+        elseif i == (total_lines - 1)
             add(lines, 'Line 14999 - [EASTER_EGG_BOTTOM]')
         else
             add(lines, 'Line ' .. i .. ' - Standard filler data to bulk out the chunk size.')
@@ -89,6 +89,16 @@ enddef
 
 export def ExpectFalse(condition: bool, context: string)
     if !condition
+        add(test_report, '[PASS] ' .. context)
+        pass_count += 1
+    else
+        add(test_report, '[FAIL] ' .. context .. ' -> Expected False, but was True')
+        fail_count += 1
+    endif
+enddef
+
+export def ExpectTrue(condition: bool, context: string)
+    if condition
         add(test_report, '[PASS] ' .. context)
         pass_count += 1
     else

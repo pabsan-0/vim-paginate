@@ -605,7 +605,7 @@ export def JumpMark(use_column: bool, char: string)
 enddef
 
 # =============================================================================
-# Info
+# Info and debugging conveniences
 # =============================================================================
 
 export def ShowPagerInfo()
@@ -652,4 +652,43 @@ export def ShowPagerInfo()
         start_line += chunk_len
     endfor
     echo '========================'
+enddef
+
+
+# Returns a list acting as a tuple: [start_line, end_line]
+export def GetCurrentChunkBoundaries(): list<number>
+    if !exists('b:pager_offset') || !exists('b:chunk_lines')
+        return [1, get(b:, 'pager_total_lines', line('$'))]
+    endif
+
+    var current_abs_line = line('.') + b:pager_offset
+    var cumulative_lines = 0
+
+    for lines_in_chunk in b:chunk_lines
+        var chunk_start = cumulative_lines + 1
+        cumulative_lines += lines_in_chunk
+        var chunk_end = cumulative_lines
+
+        # If the cursor falls within this mathematical window, return the tuple
+        if current_abs_line >= chunk_start && current_abs_line <= chunk_end
+            return [chunk_start, chunk_end]
+        endif
+    endfor
+
+    # Fallback if math fails or we are completely out of bounds
+    return [1, get(b:, 'pager_total_lines', line('$'))]
+enddef
+
+export def GetBoundaryStart(jump: bool = v:false): number
+    var boundaries = GetCurrentChunkBoundaries()
+    var target_abs_line = boundaries[0]
+    if jump | execute 'normal ' .. target_abs_line .. 'G' | endif
+    return target_abs_line
+enddef
+
+export def GetBoundaryEnd(jump: bool = v:false): number
+    var boundaries = GetCurrentChunkBoundaries()
+    var target_abs_line = boundaries[1]
+    if jump | execute 'normal ' .. target_abs_line .. 'G' | endif
+    return target_abs_line
 enddef

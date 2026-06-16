@@ -2,6 +2,7 @@ vim9script
 
 import './infra.vim' as infra
 import './scroll.vim' as scroll
+import '../autoload/paginate.vim' as paginate
 
 # TODO Add tests for search. Separate and combining * / then nN
 
@@ -14,6 +15,8 @@ def RunTests()
     infra.AssertLocation(1, v:null, 'Spawn at first line by default')
     infra.ExpectEqual(infra.total_lines, b:pager_total_lines, 'Total lines recognized correctly')
 
+    var total_chunks = exists('b:chunk_lines') ? len(b:chunk_lines) : 0
+    infra.ExpectTrue(total_chunks >= 12, 'Precondition: Test file generated ' .. total_chunks .. ' chunks (Requires >= 12)')
 
     # TODO make sure 10000j jumps over to next chunk
     infra.LogHeader('Scrolling without losing any line')
@@ -44,12 +47,12 @@ def RunTests()
     feedkeys(2 * infra.total_lines .. 'G', 'xt')
     infra.AssertLocation(infra.total_lines, v:null, 'Jump to last line with overflown G')
 
-    feedkeys('7500G', 'xt')
-    infra.AssertLocation(7500, v:null, 'Jump to Middle <count>G')
+    feedkeys(infra.total_lines / 2 .. 'G', 'xt')
+    infra.AssertLocation(infra.total_lines / 2, v:null, 'Jump to Middle <count>G')
     infra.AssertText('EASTER_EGG_MIDDLE', 'Middle Text matched')
 
-    feedkeys("14999G", 'xt')
-    infra.AssertLocation(14999, v:null, 'Jump to Bottom <count>G')
+    feedkeys(infra.total_lines - 1 .. "G", 'xt')
+    infra.AssertLocation(infra.total_lines - 1, v:null, 'Jump to Bottom <count>G')
     infra.AssertText('EASTER_EGG_BOTTOM', 'Bottom Text matched')
 
 
