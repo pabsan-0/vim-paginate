@@ -36,6 +36,9 @@ nnoremap <buffer> <silent> n  <ScriptCmd>paginate.RepeatSearch(v:true)<CR>
 nnoremap <buffer> <silent> N  <ScriptCmd>paginate.RepeatSearch(v:false)<CR>
 nnoremap <buffer> <silent> *  <ScriptCmd>paginate.SearchWordUnderCursor()<CR>
 
+nnoremap <buffer> <silent> g/ <ScriptCmd>paginate.PromptSearch(v:true, v:true)<CR>
+nnoremap <buffer> <silent> g? <ScriptCmd>paginate.PromptSearch(v:false, v:true)<CR>
+
 nnoremap <buffer> <silent> <C-f> <ScriptCmd>paginate.MoveUpDown(v:true, winheight(0))<CR>
 nnoremap <buffer> <silent> <C-b> <ScriptCmd>paginate.MoveUpDown(v:false, winheight(0))<CR>
 nnoremap <buffer> <silent> <C-d> <ScriptCmd>paginate.MoveUpDown(v:true, winheight(0) / 2)<CR>

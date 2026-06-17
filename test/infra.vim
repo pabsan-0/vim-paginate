@@ -103,7 +103,7 @@ export def ExpectTrue(condition: bool, context: string)
         add(test_report, '[PASS] ' .. context)
         pass_count += 1
     else
-        add(test_report, '[FAIL] ' .. context .. ' -> Expected False, but was True')
+        add(test_report, '[FAIL] ' .. context .. ' -> Expected True, but was False')
         fail_count += 1
     endif
 enddef

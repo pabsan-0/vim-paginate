@@ -1,9 +1,5 @@
 vim9script
 
-# Script-local state for search
-var last_search_pattern: string = ''
-var last_search_forward: bool = v:true
-
 # =============================================================================
 # Utils & helpers
 # =============================================================================
@@ -49,6 +45,12 @@ export def InitPager()
     var filename = fnamemodify(filepath, ':t')
     var tmp_dir = '/tmp/vim-pager' .. dirname
     var prefix = tmp_dir .. '/' .. filename .. '.parts_'
+
+    # Purge existing chunks from a previous execution / mkdir
+    var stale_chunks = glob(prefix .. '*', 1, 1)
+    for chunk in stale_chunks
+        delete(chunk)
+    endfor
     mkdir(tmp_dir, 'p')
 
     # Split file in chunks using UNIX split
@@ -344,56 +346,85 @@ enddef
 # Search logic (two-phase native + ripgrep)
 # =============================================================================
 
-export def PromptSearch(forward: bool)
-    var input_pattern = input(forward ? '/' : '?')
-    echo "\r"
-    if empty(input_pattern)
-        return
+export def PromptSearch(forward: bool, inverse: bool = v:false)
+    var prompt_char = (inverse ? 'g' : '') .. (forward ? '/' : '?')
+    var input_pattern = input(prompt_char)
+    echo "\r" # Clean the command line
+
+    # Strip trailing unescaped delimiters BEFORE checking for empty string
+    # This prevents `//` from bypassing the empty string check
+    var delimiter = forward ? '/' : '?'
+    if !empty(input_pattern) && input_pattern =~ delimiter .. '$' && input_pattern !~ '\\' .. delimiter .. '$'
+        input_pattern = input_pattern[: -2]
     endif
 
-    # FIXME these are custom variables? No scope?
-    last_search_pattern = input_pattern
-    last_search_forward = forward
-    ExecuteSearch(forward)
+    # Handle empty prompt (repeat last search)
+    if empty(input_pattern)
+        input_pattern = @/
+        if empty(input_pattern)
+            return
+        endif
+    endif
+
+    # Single source of truth for direction, inverse state, and pattern
+    b:pager_search_forward = forward
+    b:pager_search_inverse = inverse
+    @/ = input_pattern
+    ExecuteSearch(forward, inverse)
 enddef
 
 # FIXME This is for asterisk. Add a visual variant here.
+# FIXME Add reverse search with #
+# FIXME Add inverse search with g*
+# FIXME Add reverse inverse search with g#
 export def SearchWordUnderCursor()
-    last_search_pattern = expand('<cword>')
-    last_search_forward = v:true
-    ExecuteSearch(v:true)
+    var word = expand('<cword>')
+    if empty(word)
+        return
+    endif
+
+    b:pager_search_forward = v:true
+    b:pager_search_inverse = v:false
+    @/ = '\<' .. word .. '\>'
+    ExecuteSearch(v:true, v:false)
 enddef
 
 export def RepeatSearch(forward: bool)
-    if empty(last_search_pattern)
+    if empty(@/)
         echoerr 'No previous regular expression'
         return
     endif
 
-    var execute_forward = last_search_forward
+    var is_forward = exists('b:pager_search_forward') ? b:pager_search_forward : v:true
+    var is_inverse = exists('b:pager_search_inverse') ? b:pager_search_inverse : v:false
+
     if !forward
-        execute_forward = !last_search_forward
+        is_forward = !is_forward
     endif
-    ExecuteSearch(execute_forward)
+
+    ExecuteSearch(is_forward, is_inverse)
 enddef
 
 # FIXME: refactor into smaller functions
 # FIXME: phase 4 could be done with ripgrep, worth it?
 # FIXME: substitute-count commands should work over the whole file
-# FIXME: TEST add tests for all phases, n, N, *, /, ?
-def ExecuteSearch(forward: bool)
+def ExecuteSearch(forward: bool, inverse: bool = v:false)
+    var pattern = @/
+
+    # Vim regex to find a line that does NOT contain the pattern
+    var native_pattern = inverse ? '^\%(.*' .. pattern .. '\)\@!' : pattern
+
     try
-        @/ = last_search_pattern
         set hlsearch
     catch
     endtry
 
     var original_pos = getpos('.')
-    var safe_pattern = shellescape(last_search_pattern)
+    var safe_pattern = shellescape(pattern)
     var has_notified_wrap = v:false
 
     # Phase 1: Vim native search in current buffer
-    var native_match = search(last_search_pattern, forward ? 'W' : 'bW')
+    var native_match = search(native_pattern, forward ? 'W' : 'bW')
     if native_match > 0
         PushJump(original_pos[1] + b:pager_offset)
         CheckBoundaries()
@@ -401,17 +432,19 @@ def ExecuteSearch(forward: bool)
         return
     endif
 
-    echom "No matches in buffer: Scanning unloaded chunks for '" .. last_search_pattern .. "'..."
+    echom "No matches in buffer: Scanning unloaded chunks for '" .. pattern .. "'..."
     redraw
 
-    # Phase 2: Search from the start of next chunk to the end of chunks
-    # Phase 3: (implicit via wrapping) Search from the first chunk up to the current.
+    # Phase 2 & 3: Search from the next chunk, wrapping if necessary
     var chunk_starts = []
     var start_line = 1
     for lines in b:chunk_lines
         add(chunk_starts, start_line)
         start_line += lines
     endfor
+
+    # Add the `-v` flag to ripgrep if we are doing an inverse search
+    var rg_opts = inverse ? '--vimgrep -v' : '--vimgrep'
 
     for is_wrapped in [v:false, v:true]
         var files_to_search = []
@@ -472,9 +505,9 @@ def ExecuteSearch(forward: bool)
 
             var cmd = ''
             if forward
-                cmd = 'for f in ' .. join(files_to_search, ' ') .. '; do out=$(rg --vimgrep -m 1 -e ' .. safe_pattern .. ' "$f" 2>/dev/null); if [ -n "$out" ]; then echo "$out"; break; fi; done'
+                cmd = 'for f in ' .. join(files_to_search, ' ') .. '; do out=$(rg ' .. rg_opts .. ' -m 1 -e ' .. safe_pattern .. ' "$f" 2>/dev/null); if [ -n "$out" ]; then echo "$out"; break; fi; done'
             else
-                cmd = 'for f in ' .. join(files_to_search, ' ') .. '; do out=$(rg --vimgrep -e ' .. safe_pattern .. ' "$f" 2>/dev/null | tail -n 1); if [ -n "$out" ]; then echo "$out"; break; fi; done'
+                cmd = 'for f in ' .. join(files_to_search, ' ') .. '; do out=$(rg ' .. rg_opts .. ' -e ' .. safe_pattern .. ' "$f" 2>/dev/null | tail -n 1); if [ -n "$out" ]; then echo "$out"; break; fi; done'
             endif
 
             var res = trim(system(cmd))
@@ -501,14 +534,14 @@ def ExecuteSearch(forward: bool)
         redraw
     endif
 
-    # Phase 4: Native search in the remaining buffer
+    # Phase 4: Native search in the remaining buffer limit
     if forward
         cursor(1, 1)
-        native_match = search(last_search_pattern, 'W', original_pos[1])
+        native_match = search(native_pattern, 'W', original_pos[1])
     else
         cursor(line('$'), 1)
         normal! $
-        native_match = search(last_search_pattern, 'bW', original_pos[1])
+        native_match = search(native_pattern, 'bW', original_pos[1])
     endif
 
     if native_match > 0
@@ -519,7 +552,7 @@ def ExecuteSearch(forward: bool)
     endif
 
     setpos('.', original_pos)
-    echoerr 'Pattern not found: ' .. last_search_pattern
+    echoerr 'Pattern not found: ' .. pattern
 enddef
 
 # =============================================================================
