@@ -406,6 +406,10 @@ export def SearchUnderCursorVisual(forward: bool, inverse: bool)
         return
     endif
 
+    if inverse && text =~ "\n"
+        return
+    endif
+
     # Escape regex meta-characters for BOTH Vim and Ripgrep engines
     var escaped_text = escape(text, '\.+*?()|[]{}^$')
 

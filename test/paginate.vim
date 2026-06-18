@@ -207,7 +207,7 @@ def RunTests()
     feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines / 2,  v:null, '[n] continues [g*] search forward')
     feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4,  v:null, '[N] walks back')
     feedkeys("N", 'xt')     | infra.AssertLocation(1, v:null, '[N] walks back')
-    silent! feedkeys("1G0*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
+    silent! feedkeys("1G0g*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
 
 
     # # and g#
@@ -223,7 +223,7 @@ def RunTests()
     feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines - 1,  v:null, '[n] continues [g#] search')
     feedkeys("N", 'xt')     | infra.AssertLocation(1,  v:null, '[N] walks back')
     feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4, v:null, '[N] walks back')
-    silent! feedkeys("1G0#", 'xt') | infra.AssertLocation(1, v:null, '[g#] on a word in every line fails and stays')
+    silent! feedkeys("1G0g#", 'xt') | infra.AssertLocation(1, v:null, '[g#] on a word in every line fails and stays')
 
 
     # * and g* (visual)
@@ -232,14 +232,14 @@ def RunTests()
     feedkeys("n", 'xt')     | infra.AssertLocation(5002, v:null, '[n] continues [*] search forward to 5002')
     feedkeys("N", 'xt')     | infra.AssertLocation(5001, v:null, '[N] walks back to 5001')
     feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
-    feedkeys("GkfE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
+    feedkeys("GkfEvE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
 
     feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     feedkeys("g*", 'xt')    | infra.AssertLocation(infra.total_lines / 4, v:null, '[g*] from L5000, execute inverse forward search for word under cursor')
     feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines / 2,  v:null, '[n] continues [g*] search forward')
     feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4,  v:null, '[N] walks back')
     feedkeys("N", 'xt')     | infra.AssertLocation(1, v:null, '[N] walks back')
-    silent! feedkeys("1G0*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
+    silent! feedkeys("1G0g*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
 
 
     # # and g# (visual)
@@ -248,13 +248,14 @@ def RunTests()
     feedkeys("n", 'xt')     | infra.AssertLocation(4998, v:null, '[n] continues [#] search forward to 4998')
     feedkeys("N", 'xt')     | infra.AssertLocation(4999, v:null, '[N] walks back to 4999')
     feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
-    feedkeys("GkfE#", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[#] on a unique word wraps the entire file and lands on itself')
+    feedkeys("GkfEvE#", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[#] on a unique word wraps the entire file and lands on itself')
 
-    # TODO
-    #
-    #
-    #
-    #
+    feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("g#", 'xt')    | infra.AssertLocation(1, v:null, '[g#] from L5000, execute inverse backward search for word under cursor')
+    feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines - 1,  v:null, '[n] continues [g#] search')
+    feedkeys("N", 'xt')     | infra.AssertLocation(1,  v:null, '[N] walks back')
+    feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4, v:null, '[N] walks back')
+    silent! feedkeys("1G0g#", 'xt') | infra.AssertLocation(1, v:null, '[g#] on a word in every line fails and stays')
 
     # * and g* (visual, multi-line)
     feedkeys("5000G$bveee", 'xt')
@@ -262,21 +263,21 @@ def RunTests()
     feedkeys("n", 'xt')     | infra.AssertLocation(5002, v:null, '[n] continues [*] search forward to 5002')
     feedkeys("N", 'xt')     | infra.AssertLocation(5001, v:null, '[N] walks back to 5001')
     feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
-    feedkeys("5000GkfE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
+    feedkeys("Gk$BvEEE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
 
     feedkeys("5000G$bveee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     silent! feedkeys("g*", 'xt') | infra.AssertLocation(5000, v:null, '[g*] multiline visual inverse forward search unsupported, must stay in same place')
 
     # # and g# (visual, multi-line)
-    # TODO
-    #
-    #
-    #
-    #
+    feedkeys("5000G$bveee", 'xt')
+    feedkeys("#", 'xt')     | infra.AssertLocation(4999, v:null, 'Visual multiline [#] from L5000, executes backward search for word under cursor (lands on 4999)')
+    feedkeys("n", 'xt')     | infra.AssertLocation(4998, v:null, '[n] continues [#] search forward to 4998')
+    feedkeys("N", 'xt')     | infra.AssertLocation(4999, v:null, '[N] walks back to 4999')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
+    feedkeys("Gk$BvEEE#", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[#] on a unique word wraps the entire file and lands on itself')
 
-    # TODO
-    #
-    #
+    feedkeys("5000G$bveee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    silent! feedkeys("g#", 'xt') | infra.AssertLocation(5000, v:null, '[g#] multiline visual inverse backward search unsupported, must stay in same place')
 
     feedkeys("100G", 'xt')
     silent! feedkeys("/GIBBERISH_IMPOSSIBLE_STRING\<CR>", 'xt')
