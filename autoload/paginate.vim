@@ -377,16 +377,46 @@ enddef
 # FIXME Add reverse search with #
 # FIXME Add inverse search with g*
 # FIXME Add reverse inverse search with g#
-export def SearchWordUnderCursor()
+export def SearchUnderCursor(forward: bool, inverse: bool)
     var word = expand('<cword>')
+    echom "*# searching " .. word
+
     if empty(word)
         return
     endif
 
-    b:pager_search_forward = v:true
-    b:pager_search_inverse = v:false
+    b:pager_search_forward = forward
+    b:pager_search_inverse = inverse
     @/ = '\<' .. word .. '\>'
-    ExecuteSearch(v:true, v:false)
+    ExecuteSearch(forward, inverse)
+enddef
+
+export def SearchUnderCursorVisual(forward: bool, inverse: bool)
+    # Backup z register, as we'll use it to transport our visual selection
+    var save_reg = getreg('z')
+    var save_regtype = getregtype('z')
+
+    # Yank visual selection
+    execute "normal! \"zy"
+    var text = @z
+
+    setreg('z', save_reg, save_regtype)
+
+    if empty(text)
+        return
+    endif
+
+    # Escape regex meta-characters for BOTH Vim and Ripgrep engines
+    var escaped_text = escape(text, '\.+*?()|[]{}^$')
+
+    # Translate literal newlines (0x0A) into '\n' strings
+    var pattern = substitute(escaped_text, "\n", '\\n', 'g')
+
+    b:pager_search_forward = forward
+    b:pager_search_inverse = inverse
+    @/ = pattern
+
+    ExecuteSearch(forward, inverse)
 enddef
 
 export def RepeatSearch(forward: bool)
@@ -408,153 +438,190 @@ enddef
 # FIXME: refactor into smaller functions
 # FIXME: phase 4 could be done with ripgrep, worth it?
 # FIXME: substitute-count commands should work over the whole file
-def ExecuteSearch(forward: bool, inverse: bool = v:false)
+export def ExecuteSearch(forward: bool, inverse: bool = v:false)
     var pattern = @/
-
-    # Vim regex to find a line that does NOT contain the pattern
-    var native_pattern = inverse ? '^\%(.*' .. pattern .. '\)\@!' : pattern
-
-    try
-        set hlsearch
-    catch
-    endtry
-
     var original_pos = getpos('.')
-    var safe_pattern = shellescape(pattern)
-    var has_notified_wrap = v:false
+    var current_abs_line = original_pos[1] + b:pager_offset
 
-    # Phase 1: Vim native search in current buffer
-    var native_match = search(native_pattern, forward ? 'W' : 'bW')
-    if native_match > 0
-        PushJump(original_pos[1] + b:pager_offset)
-        CheckBoundaries()
-        silent! norm! zz
+    try | set hlsearch | catch | endtry
+
+    # Phase 1: Native Vim search in currently loaded chunks
+    var native_pattern = inverse ? '^\%(.*' .. pattern .. '\)\@!' : pattern
+    if search(native_pattern, forward ? 'W' : 'bW') > 0
+        FinalizeSearchJump(current_abs_line)
         return
     endif
 
-    echom "No matches in buffer: Scanning unloaded chunks for '" .. pattern .. "'..."
-    redraw
+    # Phase 2 & 3: Unified Ripgrep & Seam Search across unloaded chunks
+    if !SearchChunks(pattern, forward, inverse, current_abs_line)
+        setpos('.', original_pos)
+        echoerr 'Pattern not found: ' .. pattern
+    endif
+enddef
 
-    # Phase 2 & 3: Search from the next chunk, wrapping if necessary
-    var chunk_starts = []
-    var start_line = 1
-    for lines in b:chunk_lines
-        add(chunk_starts, start_line)
-        start_line += lines
-    endfor
+def SearchChunks(pattern: string, forward: bool, inverse: bool, current_abs_line: number): bool
+    echom "Scanning unloaded chunks for '" .. pattern .. "'..." | redraw
 
-    # Add the `-v` flag to ripgrep if we are doing an inverse search
+    var is_multiline = pattern =~ '\\n'
+    var rg_pattern = pattern
+    var is_word_search = v:false
+
+    if rg_pattern =~ '^\\<.*\\>$'
+        is_word_search = v:true
+        rg_pattern = rg_pattern[2 : -3]
+    endif
+
+    var safe_pattern = shellescape(rg_pattern)
     var rg_opts = inverse ? '--vimgrep -v' : '--vimgrep'
 
-    for is_wrapped in [v:false, v:true]
-        var files_to_search = []
+    if is_multiline | rg_opts ..= ' -U' | endif
+    if is_word_search | rg_opts ..= ' -w' | endif
 
-        if forward
-            if !is_wrapped
-                var scan_start = b:current_chunk_idx + 3
-                if scan_start < len(b:chunk_lines)
-                    for i in range(scan_start, len(b:chunk_lines) - 1)
-                        var chunk_file = b:pager_prefix .. printf('%05d', i)
-                        if filereadable(chunk_file)
-                            add(files_to_search, shellescape(chunk_file))
-                        endif
-                    endfor
-                endif
-            else
-                var scan_end = b:current_chunk_idx - 1
-                if scan_end >= 0
-                    for i in range(0, scan_end)
-                        var chunk_file = b:pager_prefix .. printf('%05d', i)
-                        if filereadable(chunk_file)
-                            add(files_to_search, shellescape(chunk_file))
-                        endif
-                    endfor
-                endif
-            endif
-        else
-            if !is_wrapped
-                var scan_start = b:current_chunk_idx - 1
-                if scan_start >= 0
-                    for i in range(scan_start, 0, -1)
-                        var chunk_file = b:pager_prefix .. printf('%05d', i)
-                        if filereadable(chunk_file)
-                            add(files_to_search, shellescape(chunk_file))
-                        endif
-                    endfor
-                endif
-            else
-                var scan_start = len(b:chunk_lines) - 1
-                var scan_end = b:current_chunk_idx + 3
-                if scan_start >= scan_end
-                    for i in range(scan_start, scan_end, -1)
-                        var chunk_file = b:pager_prefix .. printf('%05d', i)
-                        if filereadable(chunk_file)
-                            add(files_to_search, shellescape(chunk_file))
-                        endif
-                    endfor
-                endif
+    var search_order = GetChunkSearchOrder(forward)
+    var has_notified_wrap = v:false
+
+    var chunk_starts = [1]
+    for lines in b:chunk_lines | add(chunk_starts, chunk_starts[-1] + lines) | endfor
+
+    # Logical starting point: the edges of the currently loaded Vim buffer
+    var prev_idx = forward ? b:current_chunk_idx + 2 : b:current_chunk_idx
+
+    for idx in search_order
+        # Wrap notification
+        if forward && idx <= b:current_chunk_idx && !has_notified_wrap
+            echo 'Search hit BOTTOM, continuing at TOP' | redraw | has_notified_wrap = v:true
+        elseif !forward && idx >= b:current_chunk_idx && !has_notified_wrap
+            echo 'Search hit TOP, continuing at BOTTOM' | redraw | has_notified_wrap = v:true
+        endif
+
+        # 1. SEAM CHECK (Bridge between contiguous chunks)
+        var is_contiguous = forward ? (idx == prev_idx + 1) : (idx == prev_idx - 1)
+
+        if is_multiline && is_contiguous
+            var top_idx = min([prev_idx, idx])
+            var bot_idx = max([prev_idx, idx])
+
+            # Note: We pass the original `pattern` here because Vim's native
+            # matchstrpos() natively understands \< and \>
+            var seam = CheckSeamStraddle(top_idx, bot_idx, pattern, forward, chunk_starts, inverse)
+
+            if !empty(seam)
+                GoToRealLine(seam.real_line)
+                cursor(line('.'), seam.col)
+                FinalizeSearchJump(current_abs_line)
+                return v:true
             endif
         endif
 
-        if !empty(files_to_search)
-            if is_wrapped && !has_notified_wrap
-                echo 'search hit ' .. (forward ? 'BOTTOM' : 'TOP') .. ', continuing at ' .. (forward ? 'TOP' : 'BOTTOM')
-                redraw
-                has_notified_wrap = v:true
-            endif
-
-            var cmd = ''
-            if forward
-                cmd = 'for f in ' .. join(files_to_search, ' ') .. '; do out=$(rg ' .. rg_opts .. ' -m 1 -e ' .. safe_pattern .. ' "$f" 2>/dev/null); if [ -n "$out" ]; then echo "$out"; break; fi; done'
-            else
-                cmd = 'for f in ' .. join(files_to_search, ' ') .. '; do out=$(rg ' .. rg_opts .. ' -e ' .. safe_pattern .. ' "$f" 2>/dev/null | tail -n 1); if [ -n "$out" ]; then echo "$out"; break; fi; done'
-            endif
+        # 2. CHUNK SEARCH
+        var chunk_file = b:pager_prefix .. printf('%05d', idx)
+        if filereadable(chunk_file)
+            var cmd = forward
+                ? 'rg ' .. rg_opts .. ' -m 1 -e ' .. safe_pattern .. ' ' .. shellescape(chunk_file) .. ' 2>/dev/null'
+                : 'rg ' .. rg_opts .. ' -e ' .. safe_pattern .. ' ' .. shellescape(chunk_file) .. ' 2>/dev/null | tail -n 1'
 
             var res = trim(system(cmd))
             if !empty(res)
                 var parts = split(res, ':')
                 if len(parts) >= 3
-                    var suffix = matchstr(parts[0], '\d\{5}$')
-                    if !empty(suffix)
-                        var match_chunk_idx = str2nr(suffix)
-                        var found_real_line = chunk_starts[match_chunk_idx] + str2nr(parts[1]) - 1
-                        var found_column = str2nr(parts[2])
-                        GoToRealLine(found_real_line)
-                        cursor(line('.'), found_column)
-                        silent! norm! zz
-                        return
-                    endif
+                    var found_real_line = chunk_starts[idx] + str2nr(parts[1]) - 1
+                    var found_column = str2nr(parts[2])
+
+                    GoToRealLine(found_real_line)
+                    cursor(line('.'), found_column)
+                    FinalizeSearchJump(current_abs_line)
+                    return v:true
                 endif
             endif
         endif
+
+        # Update position for the next iteration
+        prev_idx = idx
     endfor
 
-    if !has_notified_wrap
-        echo 'search hit ' .. (forward ? 'BOTTOM' : 'TOP') .. ', continuing at ' .. (forward ? 'TOP' : 'BOTTOM')
-        redraw
-    endif
-
-    # Phase 4: Native search in the remaining buffer limit
-    if forward
-        cursor(1, 1)
-        native_match = search(native_pattern, 'W', original_pos[1])
-    else
-        cursor(line('$'), 1)
-        normal! $
-        native_match = search(native_pattern, 'bW', original_pos[1])
-    endif
-
-    if native_match > 0
-        PushJump(original_pos[1] + b:pager_offset)
-        CheckBoundaries()
-        silent! norm! zz
-        return
-    endif
-
-    setpos('.', original_pos)
-    echoerr 'Pattern not found: ' .. pattern
+    return v:false
 enddef
 
+def CheckSeamStraddle(idx1: number, idx2: number, pattern: string, forward: bool, chunk_starts: list<number>, inverse: bool): dict<any>
+    # Inverse straddling doesn't make logical sense, let Ripgrep handle inverse natively.
+    if inverse | return {} | endif
+
+    var file1 = b:pager_prefix .. printf('%05d', idx1)
+    var file2 = b:pager_prefix .. printf('%05d', idx2)
+    if !filereadable(file1) || !filereadable(file2) | return {} | endif
+
+    # Read 50 lines from the bottom of chunk 1, and 50 from the top of chunk 2
+    # FIXME compute from lenght of the pattern
+    var window = 50
+    var lines1 = readfile(file1, '', -window)
+    var lines2 = readfile(file2, '', window)
+    var seam_text = join(lines1 + lines2, "\n")
+
+    var start_idx = 0
+    var matches = []
+
+    # Find all occurrences in the stitched text
+    while v:true
+        var m = matchstrpos(seam_text, pattern, start_idx)
+        if m[1] == -1 | break | endif
+        add(matches, m)
+        start_idx = m[1] + 1
+    endwhile
+
+    if empty(matches) | return {} | endif
+
+    var len1 = len(lines1)
+    var valid_matches = []
+
+    # Filter for matches that ACTUALLY straddle the boundary
+    for m in matches
+        var prefix_start = strpart(seam_text, 0, m[1])
+        var lines_before = count(prefix_start, "\n")
+
+        var prefix_end = strpart(seam_text, 0, m[2])
+        var lines_after = count(prefix_end, "\n")
+
+        # STRADDLE CONDITION: Match must start in File 1 and end in File 2
+        if lines_before < len1 && lines_after >= len1
+            var last_nl = strridx(prefix_start, "\n")
+            var col = len(prefix_start) - last_nl
+
+            # Calculate absolute starting line
+            var abs_seam_start = chunk_starts[idx1] + b:chunk_lines[idx1] - len1
+
+            add(valid_matches, {
+                real_line: abs_seam_start + lines_before,
+                col: col
+            })
+        endif
+    endfor
+
+    if empty(valid_matches) | return {} | endif
+
+    return forward ? valid_matches[0] : valid_matches[-1]
+enddef
+
+def FinalizeSearchJump(orig_absolute_line: number)
+    PushJump(orig_absolute_line)
+    CheckBoundaries()
+    silent! norm! zz
+enddef
+
+def GetChunkSearchOrder(forward: bool): list<number>
+    var order = []
+    var current = b:current_chunk_idx
+    var total = len(b:chunk_lines)
+
+    if forward
+        if current + 3 < total | order += range(current + 3, total - 1) | endif
+        order += range(0, min([current + 2, total - 1]))
+    else
+        if current - 1 >= 0 | order += range(current - 1, 0, -1) | endif
+        order += range(total - 1, current, -1)
+    endif
+
+    return order
+enddef
 # =============================================================================
 # Custom jump list engine
 # =============================================================================

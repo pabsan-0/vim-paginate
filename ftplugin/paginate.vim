@@ -34,7 +34,16 @@ nnoremap <buffer> <silent> /  <ScriptCmd>paginate.PromptSearch(v:true)<CR>
 nnoremap <buffer> <silent> ?  <ScriptCmd>paginate.PromptSearch(v:false)<CR>
 nnoremap <buffer> <silent> n  <ScriptCmd>paginate.RepeatSearch(v:true)<CR>
 nnoremap <buffer> <silent> N  <ScriptCmd>paginate.RepeatSearch(v:false)<CR>
-nnoremap <buffer> <silent> *  <ScriptCmd>paginate.SearchWordUnderCursor()<CR>
+
+nnoremap <buffer> <silent> *   <ScriptCmd>paginate.SearchUnderCursor(v:true, v:false)<CR>
+nnoremap <buffer> <silent> g*  <ScriptCmd>paginate.SearchUnderCursor(v:true, v:true)<CR>
+nnoremap <buffer> <silent> #   <ScriptCmd>paginate.SearchUnderCursor(v:false, v:false)<CR>
+nnoremap <buffer> <silent> g#  <ScriptCmd>paginate.SearchUnderCursor(v:false, v:true)<CR>
+
+xnoremap <buffer> <silent> *   <ScriptCmd>paginate.SearchUnderCursorVisual(v:true, v:false)<CR>
+xnoremap <buffer> <silent> g*   <ScriptCmd>paginate.SearchUnderCursorVisual(v:true, v:true)<CR>
+xnoremap <buffer> <silent> #   <ScriptCmd>paginate.SearchUnderCursorVisual(v:false, v:false)<CR>
+xnoremap <buffer> <silent> g#   <ScriptCmd>paginate.SearchUnderCursorVisual(v:false, v:true)<CR>
 
 nnoremap <buffer> <silent> g/ <ScriptCmd>paginate.PromptSearch(v:true, v:true)<CR>
 nnoremap <buffer> <silent> g? <ScriptCmd>paginate.PromptSearch(v:false, v:true)<CR>

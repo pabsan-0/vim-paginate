@@ -152,13 +152,19 @@ def RunTests()
     feedkeys("``", 'xt')     | infra.AssertLocation(1, v:null, 'Jump back to exact previous context') # TODO
 
 
-    # TODO correct and make work
     infra.LogHeader('Search engine')
     feedkeys("gg/EASTER_EGG_TOP\<CR>", 'xt')    | infra.AssertLocation(1, v:null, 'Native RAM Forward Search')
     feedkeys("gg/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, 'Cross-Chunk Forward Search (Ripgrep)')
     feedkeys("G?EASTER_EGG_TOP\<CR>", 'xt')     | infra.AssertLocation(1, v:null, 'Cross-Chunk Backward Search (Ripgrep)')
     feedkeys("7500G/EASTER_EGG_TOP\<CR>", 'xt') | infra.AssertLocation(1, v:null, 'Wrapped Forward Search (Cross-Chunk)')
 
+    # Not sure i need these
+    feedkeys("/MARK_TARGET\<CR>", 'xt')       | infra.AssertLocation(infra.total_lines / 4, v:null, 'Direct jump to 2500')
+    feedkeys("?EASTER_EGG_TOP\<CR>", 'xt')    | infra.AssertLocation(1, v:null, 'Direct jump backward to 1')
+    feedkeys("/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, 'Direct jump forward to bottom')
+
+
+    # / and g/
     feedkeys("2G", 'xt')
     feedkeys("/EASTER_EGG\<CR>", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[/] Forward search finds middle egg')
     feedkeys("n", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[n] (forward context) finds bottom egg')
@@ -166,23 +172,111 @@ def RunTests()
     feedkeys("N", 'xt') | infra.AssertLocation(1, v:null, '[N] walks back to top egg')
     feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[N] wraps around the bottom to find bottom egg')
 
+    feedkeys("gg", 'xt') # Notice that the current line is already a match, however it is skipped so that Search navigates
+    feedkeys("g/Standard\<CR>", 'xt') | infra.AssertLocation(infra.total_lines / 4, v:null, '[g/] Inverse forward search finds middle egg')
+    feedkeys("n", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[n] (forward context) finds bottom egg')
+    feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines / 4, v:null, '[N] (reverse context) walks back to middle egg')
+    feedkeys("N", 'xt') | infra.AssertLocation(1, v:null, '[N] walks back to top egg')
+    feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[N] wraps around the bottom to find bottom egg')
+
+
+    # ? and g?
     feedkeys("2G", 'xt')
     feedkeys("?EASTER_EGG\<CR>", 'xt') | infra.AssertLocation(1, v:null, '[?] Backward search finds top egg immediately')
     feedkeys("n", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[n] (backward context!) wraps to bottom egg')
     feedkeys("n", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[n] walks backward to middle egg')
     feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[N] (forward context!) walks forward to bottom egg')
 
-    feedkeys("5000G", 'xt')
-    feedkeys("0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
-    feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, '[*] executes forward search for word under cursor (lands on 5001)')
+    feedkeys("gg", 'xt')
+    feedkeys("g?Standard\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[g?] Inverse backward search finds top egg immediately')
+    feedkeys("n", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[n] (backward context!) wraps to bottom egg')
+    feedkeys("n", 'xt') | infra.AssertLocation(infra.total_lines / 4, v:null, '[n] walks backward to middle egg')
+    feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[N] (forward context!) walks forward to bottom egg')
+
+
+    # * and g*
+    feedkeys("5000G0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, '[*] from L5000, executes forward search for word under cursor (lands on 5001)')
     feedkeys("n", 'xt')     | infra.AssertLocation(5002, v:null, '[n] continues [*] search forward to 5002')
     feedkeys("N", 'xt')     | infra.AssertLocation(5001, v:null, '[N] walks back to 5001')
     feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
     feedkeys("GkfE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
 
-    feedkeys("/MARK_TARGET\<CR>", 'xt')       | infra.AssertLocation(infra.total_lines / 4, v:null, 'Direct jump to 2500')
-    feedkeys("?EASTER_EGG_TOP\<CR>", 'xt')    | infra.AssertLocation(1, v:null, 'Direct jump backward to 1')
-    feedkeys("/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, 'Direct jump forward to bottom')
+    feedkeys("5000G0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("g*", 'xt')    | infra.AssertLocation(infra.total_lines / 4, v:null, '[g*] from L5000, execute inverse forward search for word under cursor')
+    feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines / 2,  v:null, '[n] continues [g*] search forward')
+    feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4,  v:null, '[N] walks back')
+    feedkeys("N", 'xt')     | infra.AssertLocation(1, v:null, '[N] walks back')
+    silent! feedkeys("1G0*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
+
+
+    # # and g#
+    feedkeys("5000G0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("#", 'xt')     | infra.AssertLocation(4999, v:null, '[#] from L5000, executes backward search for word under cursor (lands on 4999)')
+    feedkeys("n", 'xt')     | infra.AssertLocation(4998, v:null, '[n] continues [#] search forward to 4998')
+    feedkeys("N", 'xt')     | infra.AssertLocation(4999, v:null, '[N] walks back to 4999')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
+    feedkeys("GkfE#", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[#] on a unique word wraps the entire file and lands on itself')
+
+    feedkeys("5000G0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("g#", 'xt')    | infra.AssertLocation(1, v:null, '[g#] from L5000, execute inverse backward search for word under cursor')
+    feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines - 1,  v:null, '[n] continues [g#] search')
+    feedkeys("N", 'xt')     | infra.AssertLocation(1,  v:null, '[N] walks back')
+    feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4, v:null, '[N] walks back')
+    silent! feedkeys("1G0#", 'xt') | infra.AssertLocation(1, v:null, '[g#] on a word in every line fails and stays')
+
+
+    # * and g* (visual)
+    feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, 'Visual [*] from L5000, executes forward search for word under cursor (lands on 5001)')
+    feedkeys("n", 'xt')     | infra.AssertLocation(5002, v:null, '[n] continues [*] search forward to 5002')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5001, v:null, '[N] walks back to 5001')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
+    feedkeys("GkfE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
+
+    feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("g*", 'xt')    | infra.AssertLocation(infra.total_lines / 4, v:null, '[g*] from L5000, execute inverse forward search for word under cursor')
+    feedkeys("n", 'xt')     | infra.AssertLocation(infra.total_lines / 2,  v:null, '[n] continues [g*] search forward')
+    feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4,  v:null, '[N] walks back')
+    feedkeys("N", 'xt')     | infra.AssertLocation(1, v:null, '[N] walks back')
+    silent! feedkeys("1G0*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
+
+
+    # # and g# (visual)
+    feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    feedkeys("#", 'xt')     | infra.AssertLocation(4999, v:null, 'Visual [#] from L5000, executes backward search for word under cursor (lands on 4999)')
+    feedkeys("n", 'xt')     | infra.AssertLocation(4998, v:null, '[n] continues [#] search forward to 4998')
+    feedkeys("N", 'xt')     | infra.AssertLocation(4999, v:null, '[N] walks back to 4999')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
+    feedkeys("GkfE#", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[#] on a unique word wraps the entire file and lands on itself')
+
+    # TODO
+    #
+    #
+    #
+    #
+
+    # * and g* (visual, multi-line)
+    feedkeys("5000G$bveee", 'xt')
+    feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, 'Visual multiline [*] from L5000, executes forward search for word under cursor (lands on 5001)')
+    feedkeys("n", 'xt')     | infra.AssertLocation(5002, v:null, '[n] continues [*] search forward to 5002')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5001, v:null, '[N] walks back to 5001')
+    feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
+    feedkeys("5000GkfE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
+
+    feedkeys("5000G$bveee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
+    silent! feedkeys("g*", 'xt') | infra.AssertLocation(5000, v:null, '[g*] multiline visual inverse forward search unsupported, must stay in same place')
+
+    # # and g# (visual, multi-line)
+    # TODO
+    #
+    #
+    #
+    #
+
+    # TODO
+    #
+    #
 
     feedkeys("100G", 'xt')
     silent! feedkeys("/GIBBERISH_IMPOSSIBLE_STRING\<CR>", 'xt')
@@ -191,11 +285,6 @@ def RunTests()
     infra.AssertLocation(100, v:null, 'Failed backward search cleanly aborts and restores original cursor')
     silent! feedkeys("n", 'xt')
     infra.AssertLocation(100, v:null, 'Pressing [n] after a failed search safely does nothing')
-
-    # TO BE IMPLEMENTED
-    feedkeys("gg", 'xt')
-    silent! feedkeys("g/Standard filler\<CR>", 'xt')
-    infra.AssertLocation(infra.total_lines / 4, v:null, 'Inverse search skips filler lines and lands on target (expected failure)')
 
     feedkeys("gg/MARK_TARGET\<CR>", 'xt')          | infra.AssertLocation(infra.total_lines / 4, v:null, 'Setup: Establish last_search_pattern as MARK_TARGET')
     feedkeys("gg/\<CR>", 'xt')                     | infra.AssertLocation(infra.total_lines / 4, v:null, '[/<CR>] Empty forward prompt correctly repeats last search')
