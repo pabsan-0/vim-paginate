@@ -13,6 +13,8 @@ setlocal buftype=nofile
 setlocal bufhidden=wipe
 setlocal noswapfile
 setlocal undolevels=-1
+setlocal ignorecase
+setlocal smartcase
 
 augroup PaginateBufferAutocmds
     autocmd! * <buffer>

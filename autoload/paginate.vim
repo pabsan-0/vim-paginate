@@ -447,6 +447,12 @@ export def ExecuteSearch(forward: bool, inverse: bool = v:false)
     var original_pos = getpos('.')
     var current_abs_line = original_pos[1] + b:pager_offset
 
+    # FIXME add support in the future
+    if pattern =~# '\\c' || pattern =~# '\\C'
+        echoerr 'Explicit case overrides (\c or \C) are not supported: Smartcase enforced.'
+        return
+    endif
+
     # Hacky way to set highlighting bypassing Vim's timing, that
     # would otherwise cause hl to show momentarily then go away
     if &hlsearch
@@ -480,7 +486,11 @@ def SearchChunks(pattern: string, forward: bool, inverse: bool, current_abs_line
     endif
 
     var safe_pattern = shellescape(rg_pattern)
-    var rg_opts = inverse ? '--vimgrep -v' : '--vimgrep'
+    var rg_opts = ""
+    rg_opts ..= inverse ? '--vimgrep -v' : '--vimgrep'
+    rg_opts ..= is_multiline ? ' -U' : ''
+    rg_opts ..= is_word_search ? ' -w' : ''
+    rg_opts ..= " --smart-case"
 
     if is_multiline | rg_opts ..= ' -U' | endif
     if is_word_search | rg_opts ..= ' -w' | endif
@@ -502,7 +512,7 @@ def SearchChunks(pattern: string, forward: bool, inverse: bool, current_abs_line
             echo 'Search hit TOP, continuing at BOTTOM' | redraw | has_notified_wrap = v:true
         endif
 
-        # 1. SEAM CHECK (Bridge between contiguous chunks)
+        # Seam check (Bridge between contiguous chunks)
         var is_contiguous = forward ? (idx == prev_idx + 1) : (idx == prev_idx - 1)
 
         if is_multiline && is_contiguous
@@ -521,7 +531,7 @@ def SearchChunks(pattern: string, forward: bool, inverse: bool, current_abs_line
             endif
         endif
 
-        # 2. CHUNK SEARCH
+        # Chunk search
         var chunk_file = b:pager_prefix .. printf('%05d', idx)
         if filereadable(chunk_file)
             var cmd = forward

@@ -290,6 +290,11 @@ def RunTests()
     silent! feedkeys("g#", 'xt') | infra.AssertLocation(5000, v:null, '[g#] multiline visual inverse backward search unsupported, must stay in same place')
 
 
+    infra.LogHeader('Search Case Sensitivity (Forced Smartcase)')
+    feedkeys("15000G/easter_egg_top\<CR>", 'xt') | infra.AssertLocation(1, v:null, '[smartcase] Lowercase query ignores case and finds UPPERCASE match')
+    silent! feedkeys("15000G/EASTER_egg_top\<CR>", 'xt') | infra.AssertLocation(15000, v:null, '[smartcase] Mixed-case query enforces case and correctly fails to find mismatch')
+    silent! feedkeys("15000G/easter_egg_bottom\\c\<CR>", 'xt') | infra.AssertLocation(15000, v:null, '[\\c] Stripped cleanly, falls back to forced smartcase')
+
     infra.LogHeader('Visual Selection Restoration (gv)')
     var first_seam = b:chunk_lines[0]
     feedkeys("100GV2j\<Esc>10Ggv\<Esc>", 'xt') | infra.AssertLocation(102, v:null, '[gv] correctly restores line-wise visual selection in the same chunk')
