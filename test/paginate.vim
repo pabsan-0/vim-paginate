@@ -263,7 +263,7 @@ def RunTests()
 
 
     infra.LogHeader('Search engine sequence: visual multiline * g* and # g#')
-    var first_seam = b:chunk_lines[0]
+    var seam = b:chunk_lines[0]
     # * and g* (visual, multi-line)
     feedkeys("5000G$bveee", 'xt')
     feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, 'Visual multiline [*] from L5000, executes forward search for word under cursor (lands on 5001)')
@@ -271,6 +271,8 @@ def RunTests()
     feedkeys("N", 'xt')     | infra.AssertLocation(5001, v:null, '[N] walks back to 5001')
     feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
     feedkeys("Gk$BvEEE*", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[*] on a unique word wraps the entire file and lands on itself')
+    feedkeys(seam .. "Gkk$bveee*nnnNN", 'xt') | infra.AssertLocation(seam, v:null, '[*n]  multiline sequence works across seams.')
+
 
     feedkeys("5000G$bveee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     silent! feedkeys("g*", 'xt') | infra.AssertLocation(5000, v:null, '[g*] multiline visual inverse forward search unsupported, must stay in same place')
@@ -282,6 +284,7 @@ def RunTests()
     feedkeys("N", 'xt')     | infra.AssertLocation(4999, v:null, '[N] walks back to 4999')
     feedkeys("N", 'xt')     | infra.AssertLocation(5000, v:null, '[N] returns exactly to the original word on 5000')
     feedkeys("Gk$BvEEE#", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[#] on a unique word wraps the entire file and lands on itself')
+    feedkeys(seam .. "Gjj$bveee#nnnNN", 'xt') | infra.AssertLocation(seam, v:null, '[*n]  multiline sequence works across seams.')
 
     feedkeys("5000G$bveee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     silent! feedkeys("g#", 'xt') | infra.AssertLocation(5000, v:null, '[g#] multiline visual inverse backward search unsupported, must stay in same place')
