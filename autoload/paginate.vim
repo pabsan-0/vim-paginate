@@ -724,6 +724,51 @@ export def JumpMark(use_column: bool, char: string)
     endif
 enddef
 
+
+# =============================================================================
+# Visual Mode State Management
+# =============================================================================
+
+export def SaveVisualState()
+    # Abort if we are not inside an active pager buffer
+    if !exists('b:pager_offset')
+        return
+    endif
+
+    # Capture the absolute real lines of the visual selection upon exiting
+    b:pager_vis_start = getpos("'<")
+    b:pager_vis_start[1] += b:pager_offset
+    b:pager_vis_end = getpos("'>")
+    b:pager_vis_end[1] += b:pager_offset
+enddef
+
+export def RestoreVisualState()
+    if !exists('b:pager_vis_start') || !exists('b:pager_vis_end')
+        return
+    endif
+
+    # If the start of the visual selection is out of the current chunk window, jump to it
+    if b:pager_vis_start[1] <= b:pager_offset || b:pager_vis_start[1] > b:pager_offset + line('$')
+        GoToRealLine(b:pager_vis_start[1])
+    endif
+
+    # Translate absolute lines back to current buffer lines
+    var buf_start = b:pager_vis_start[1] - b:pager_offset
+    var buf_end = b:pager_vis_end[1] - b:pager_offset
+
+    # Clamp the end of the selection if it bleeds out of the loaded chunks
+    if buf_end > line('$')
+        buf_end = line('$')
+    endif
+
+    # Manually overwrite the native marks with the corrected buffer lines
+    setpos("'<", [0, buf_start, b:pager_vis_start[2], 0])
+    setpos("'>", [0, buf_end, b:pager_vis_end[2], 0])
+
+    # Execute native gv to reselect
+    execute 'normal! gv'
+enddef
+
 # =============================================================================
 # Info and debugging conveniences
 # =============================================================================

@@ -4,8 +4,6 @@ import './infra.vim' as infra
 import './scroll.vim' as scroll
 import '../autoload/paginate.vim' as paginate
 
-# TODO Add tests for search. Separate and combining * / then nN
-
 def RunTests()
     infra.BeginSuite()
 
@@ -142,14 +140,10 @@ def RunTests()
 
 
     infra.LogHeader('Marks')
-    feedkeys("1500G", 'xt')
-    feedkeys("ma", 'xt')     | infra.AssertLocation(1500, v:null, 'Setup: Placed mark "a" at line 1500')
-    feedkeys("12000G", 'xt') | infra.AssertLocation(12000, v:null, 'Moved to line 12000 (different chunk)')
-    feedkeys("'a", 'xt')     | infra.AssertLocation(1500, v:null, 'Line jump to local mark "a" across chunks')
-    feedkeys("3000G5lmb9000G", 'xt')
-    feedkeys("`b", 'xt')     | infra.AssertLocation(3000, v:null, 'Exact jump to local mark "b" across chunks')
-    feedkeys("''", 'xt')     | infra.AssertLocation(1, v:null, 'Jump to previous context line') # TODO
-    feedkeys("``", 'xt')     | infra.AssertLocation(1, v:null, 'Jump back to exact previous context') # TODO
+    feedkeys("1500Gma12000G'a", 'xt')  | infra.AssertLocation(1500, v:null, 'Line jump to local mark "a" across chunks')
+    feedkeys("3000G5lmb9000G`b", 'xt') | infra.AssertLocation(3000, v:null, 'Exact jump to local mark "b" across chunks')
+    feedkeys("100G200G''", 'xt')       | infra.AssertLocation(100, v:null, 'Jump to previous context line')
+    feedkeys("100G200G``", 'xt')       | infra.AssertLocation(100, v:null, 'Jump back to exact previous context')
 
 
     infra.LogHeader('Search engine')
@@ -294,6 +288,15 @@ def RunTests()
     silent! feedkeys("14000G??\<CR>", 'xt')        | infra.AssertLocation(infra.total_lines / 4, v:null, '[??] Blank question-closed pattern repeats last backward search')
     silent! feedkeys("500G/EASTER_EGG_TOP/\<CR>", 'xt')    | infra.AssertLocation(1, v:null, '[/pattern/] Trailing slash is correctly ignored as a delimiter')
     silent! feedkeys("500G?EASTER_EGG_BOTTOM?\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[?pattern?] Trailing question mark is correctly ignored as a delimiter')
+
+    infra.LogHeader('Visual Selection Restoration (gv)')
+    var first_seam = b:chunk_lines[0]
+    feedkeys("100GV2j\<Esc>10Ggv\<Esc>", 'xt') | infra.AssertLocation(102, v:null, '[gv] correctly restores line-wise visual selection in the same chunk')
+    feedkeys("100G0v5l\<Esc>20000Ggv\<Esc>", 'xt') | infra.AssertLocation(100, v:null, '[gv] forces chunk reload and restores character-wise selection across remote chunks')
+    feedkeys(first_seam - 1 .. "GV2j\<Esc>15000Ggv\<Esc>", 'xt') | infra.AssertLocation(first_seam + 1, v:null, '[gv] correctly restores a visual block that straddles two chunks')
+
+    feedkeys(":unlet! b:pager_vis_start b:pager_vis_end\<CR>", 'xt')
+    silent! feedkeys("10Ggv\<Esc>", 'xt') | infra.AssertLocation(10, v:null, '[gv] fails cleanly and stays in place if visual state is completely absent')
 
     infra.EndSuite()
 enddef

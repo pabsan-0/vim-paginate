@@ -60,5 +60,9 @@ nnoremap <buffer> <silent> ` <ScriptCmd>paginate.JumpMark(v:true, getcharstr())<
 nnoremap <buffer> <silent> <C-o> <ScriptCmd>paginate.NavigateJump(v:true)<CR>
 nnoremap <buffer> <silent> <C-i> <ScriptCmd>paginate.NavigateJump(v:false)<CR>
 
+nnoremap <buffer> <silent> `` <ScriptCmd>paginate.NavigateJump(v:true)<CR>
+nnoremap <buffer> <silent> '' <ScriptCmd>paginate.NavigateJump(v:true)<CR>
+nnoremap <buffer> <silent> gv <ScriptCmd>paginate.RestoreVisualState()<CR>
+
 nnoremap <buffer> <silent> [c <ScriptCmd>paginate.GetBoundaryStart(v:true)<CR>
 nnoremap <buffer> <silent> ]c <ScriptCmd>paginate.GetBoundaryEnd(v:true)<CR>

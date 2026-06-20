@@ -2,6 +2,8 @@ vim9script
 
 import './infra.vim' as infra
 
+# FIXME these tests are not accounted for in the test count
+
 export def ScrollForward(keys: string, NextLine: func(any): any, skip_start: number = 0, skip_end: number = 0)
     var start_line = 1 + skip_start
     feedkeys(start_line .. 'G', 'xt') # Use feedkeys to ensure Pager catches the jump
