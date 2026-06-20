@@ -142,22 +142,33 @@ def RunTests()
     infra.LogHeader('Marks')
     feedkeys("1500Gma12000G'a", 'xt')  | infra.AssertLocation(1500, v:null, 'Line jump to local mark "a" across chunks')
     feedkeys("3000G5lmb9000G`b", 'xt') | infra.AssertLocation(3000, v:null, 'Exact jump to local mark "b" across chunks')
-    feedkeys("100G200G''", 'xt')       | infra.AssertLocation(100, v:null, 'Jump to previous context line')
-    feedkeys("100G200G``", 'xt')       | infra.AssertLocation(100, v:null, 'Jump back to exact previous context')
+    feedkeys("100G200G''", 'xt')       | infra.AssertLocation(100, v:null, 'Jump back once with '''' ')
+    feedkeys("100G200G``", 'xt')       | infra.AssertLocation(100, v:null, 'Jump back once with ``')
 
 
-    infra.LogHeader('Search engine')
+    infra.LogHeader('Search engine: direct searches')
     feedkeys("gg/EASTER_EGG_TOP\<CR>", 'xt')    | infra.AssertLocation(1, v:null, 'Native RAM Forward Search')
     feedkeys("gg/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, 'Cross-Chunk Forward Search (Ripgrep)')
     feedkeys("G?EASTER_EGG_TOP\<CR>", 'xt')     | infra.AssertLocation(1, v:null, 'Cross-Chunk Backward Search (Ripgrep)')
-    feedkeys("7500G/EASTER_EGG_TOP\<CR>", 'xt') | infra.AssertLocation(1, v:null, 'Wrapped Forward Search (Cross-Chunk)')
+    feedkeys("G/MARK_TARGET\<CR>", 'xt')       | infra.AssertLocation(infra.total_lines / 4, v:null, 'Direct jump to 2500 with file wrap')
+    feedkeys("gg?EASTER_EGG_TOP\<CR>", 'xt')   | infra.AssertLocation(1, v:null, 'Direct jump backward to 1 with file wrap')
+    feedkeys("G/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, 'Direct jump forward to bottom with file wrap')
 
-    # Not sure i need these
-    feedkeys("/MARK_TARGET\<CR>", 'xt')       | infra.AssertLocation(infra.total_lines / 4, v:null, 'Direct jump to 2500')
-    feedkeys("?EASTER_EGG_TOP\<CR>", 'xt')    | infra.AssertLocation(1, v:null, 'Direct jump backward to 1')
-    feedkeys("/EASTER_EGG_BOTTOM\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, 'Direct jump forward to bottom')
+    feedkeys("100G", 'xt')
+    silent! feedkeys("/GIBBERISH_IMPOSSIBLE_STRING\<CR>", 'xt') | infra.AssertLocation(100, v:null, 'Failed forward search cleanly aborts and restores original cursor')
+    silent! feedkeys("?ANOTHER_IMPOSSIBLE_STRING\<CR>", 'xt') | infra.AssertLocation(100, v:null, 'Failed backward search cleanly aborts and restores original cursor')
+    silent! feedkeys("n", 'xt') | infra.AssertLocation(100, v:null, 'Pressing [n] after a failed search safely does nothing')
+
+    feedkeys("gg/MARK_TARGET\<CR>", 'xt')          | infra.AssertLocation(infra.total_lines / 4, v:null, 'Setup: Establish last_search_pattern as MARK_TARGET')
+    feedkeys("gg/\<CR>", 'xt')                     | infra.AssertLocation(infra.total_lines / 4, v:null, '[/<CR>] Empty forward prompt correctly repeats last search')
+    feedkeys("14000G?\<CR>", 'xt')                 | infra.AssertLocation(infra.total_lines / 4, v:null, '[?<CR>] Empty backward prompt correctly repeats last search')
+    silent! feedkeys("gg//\<CR>", 'xt')            | infra.AssertLocation(infra.total_lines / 4, v:null, '[//] Blank slash-closed pattern repeats last forward search')
+    silent! feedkeys("14000G??\<CR>", 'xt')        | infra.AssertLocation(infra.total_lines / 4, v:null, '[??] Blank question-closed pattern repeats last backward search')
+    silent! feedkeys("500G/EASTER_EGG_TOP/\<CR>", 'xt')    | infra.AssertLocation(1, v:null, '[/pattern/] Trailing slash is correctly ignored as a delimiter')
+    silent! feedkeys("500G?EASTER_EGG_BOTTOM?\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[?pattern?] Trailing question mark is correctly ignored as a delimiter')
 
 
+    infra.LogHeader('Search engine sequence: / g/ and ? g?')
     # / and g/
     feedkeys("2G", 'xt')
     feedkeys("/EASTER_EGG\<CR>", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[/] Forward search finds middle egg')
@@ -173,7 +184,6 @@ def RunTests()
     feedkeys("N", 'xt') | infra.AssertLocation(1, v:null, '[N] walks back to top egg')
     feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[N] wraps around the bottom to find bottom egg')
 
-
     # ? and g?
     feedkeys("2G", 'xt')
     feedkeys("?EASTER_EGG\<CR>", 'xt') | infra.AssertLocation(1, v:null, '[?] Backward search finds top egg immediately')
@@ -188,6 +198,7 @@ def RunTests()
     feedkeys("N", 'xt') | infra.AssertLocation(infra.total_lines / 2, v:null, '[N] (forward context!) walks forward to bottom egg')
 
 
+    infra.LogHeader('Search engine sequence: * g* and # g#')
     # * and g*
     feedkeys("5000G0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, '[*] from L5000, executes forward search for word under cursor (lands on 5001)')
@@ -202,7 +213,6 @@ def RunTests()
     feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4,  v:null, '[N] walks back')
     feedkeys("N", 'xt')     | infra.AssertLocation(1, v:null, '[N] walks back')
     silent! feedkeys("1G0g*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
-
 
     # # and g#
     feedkeys("5000G0fS", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
@@ -220,6 +230,7 @@ def RunTests()
     silent! feedkeys("1G0g#", 'xt') | infra.AssertLocation(1, v:null, '[g#] on a word in every line fails and stays')
 
 
+    infra.LogHeader('Search engine sequence: visual * g* and # g#')
     # * and g* (visual)
     feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, 'Visual [*] from L5000, executes forward search for word under cursor (lands on 5001)')
@@ -234,7 +245,6 @@ def RunTests()
     feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4,  v:null, '[N] walks back')
     feedkeys("N", 'xt')     | infra.AssertLocation(1, v:null, '[N] walks back')
     silent! feedkeys("1G0g*", 'xt') | infra.AssertLocation(1, v:null, '[g*] on a word in every line fails and stays')
-
 
     # # and g# (visual)
     feedkeys("5000G0fSvee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
@@ -251,6 +261,9 @@ def RunTests()
     feedkeys("N", 'xt')     | infra.AssertLocation(infra.total_lines / 4, v:null, '[N] walks back')
     silent! feedkeys("1G0g#", 'xt') | infra.AssertLocation(1, v:null, '[g#] on a word in every line fails and stays')
 
+
+    infra.LogHeader('Search engine sequence: visual multiline * g* and # g#')
+    var first_seam = b:chunk_lines[0]
     # * and g* (visual, multi-line)
     feedkeys("5000G$bveee", 'xt')
     feedkeys("*", 'xt')     | infra.AssertLocation(5001, v:null, 'Visual multiline [*] from L5000, executes forward search for word under cursor (lands on 5001)')
@@ -273,21 +286,6 @@ def RunTests()
     feedkeys("5000G$bveee", 'xt') # Move cursor explicitly to the 'S' in 'Standard'
     silent! feedkeys("g#", 'xt') | infra.AssertLocation(5000, v:null, '[g#] multiline visual inverse backward search unsupported, must stay in same place')
 
-    feedkeys("100G", 'xt')
-    silent! feedkeys("/GIBBERISH_IMPOSSIBLE_STRING\<CR>", 'xt')
-    infra.AssertLocation(100, v:null, 'Failed forward search cleanly aborts and restores original cursor')
-    silent! feedkeys("?ANOTHER_IMPOSSIBLE_STRING\<CR>", 'xt')
-    infra.AssertLocation(100, v:null, 'Failed backward search cleanly aborts and restores original cursor')
-    silent! feedkeys("n", 'xt')
-    infra.AssertLocation(100, v:null, 'Pressing [n] after a failed search safely does nothing')
-
-    feedkeys("gg/MARK_TARGET\<CR>", 'xt')          | infra.AssertLocation(infra.total_lines / 4, v:null, 'Setup: Establish last_search_pattern as MARK_TARGET')
-    feedkeys("gg/\<CR>", 'xt')                     | infra.AssertLocation(infra.total_lines / 4, v:null, '[/<CR>] Empty forward prompt correctly repeats last search')
-    feedkeys("14000G?\<CR>", 'xt')                 | infra.AssertLocation(infra.total_lines / 4, v:null, '[?<CR>] Empty backward prompt correctly repeats last search')
-    silent! feedkeys("gg//\<CR>", 'xt')            | infra.AssertLocation(infra.total_lines / 4, v:null, '[//] Blank slash-closed pattern repeats last forward search')
-    silent! feedkeys("14000G??\<CR>", 'xt')        | infra.AssertLocation(infra.total_lines / 4, v:null, '[??] Blank question-closed pattern repeats last backward search')
-    silent! feedkeys("500G/EASTER_EGG_TOP/\<CR>", 'xt')    | infra.AssertLocation(1, v:null, '[/pattern/] Trailing slash is correctly ignored as a delimiter')
-    silent! feedkeys("500G?EASTER_EGG_BOTTOM?\<CR>", 'xt') | infra.AssertLocation(infra.total_lines - 1, v:null, '[?pattern?] Trailing question mark is correctly ignored as a delimiter')
 
     infra.LogHeader('Visual Selection Restoration (gv)')
     var first_seam = b:chunk_lines[0]
