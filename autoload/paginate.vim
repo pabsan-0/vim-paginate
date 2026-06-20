@@ -447,7 +447,11 @@ export def ExecuteSearch(forward: bool, inverse: bool = v:false)
     var original_pos = getpos('.')
     var current_abs_line = original_pos[1] + b:pager_offset
 
-    try | set hlsearch | catch | endtry
+    # Hacky way to set highlighting bypassing Vim's timing, that
+    # would otherwise cause hl to show momentarily then go away
+    if &hlsearch
+        feedkeys("\<Cmd>let v:hlsearch = 1\<CR>", 'n')
+    endif
 
     # Phase 1: Native Vim search in currently loaded chunks
     var native_pattern = inverse ? '^\%(.*' .. pattern .. '\)\@!' : pattern
