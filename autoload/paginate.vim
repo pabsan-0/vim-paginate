@@ -7,6 +7,9 @@ vim9script
 # Formats an integer like 1000000 into "1_000_000", for readable user display
 def FormatNum(n: number): string
     var s = string(n)
+    var is_negative = s[0] == '-'
+    if is_negative | s = s[1 : ] | endif
+
     var result = ''
     var length = len(s)
     for i in range(length)
@@ -16,7 +19,8 @@ def FormatNum(n: number): string
             result ..= '_'
         endif
     endfor
-    return result
+
+    return is_negative ? '-' .. result : result
 enddef
 
 # FIXME keep?
@@ -31,12 +35,23 @@ enddef
 # =============================================================================
 
 export def InitPager()
+    if &filetype == 'paginate'
+        echoerr 'This buffer is already a pager.'
+        return
+    endif
+
     # Fetch initial file and location
     var original_buf = bufnr('%')
     var original_line = line('.')
     var filepath = expand('%:p')
     if empty(filepath)
         echoerr 'No file currently loaded.'
+        return
+    endif
+
+    var virtual_name = 'paginate://' .. filepath
+    if bufexists(virtual_name)
+        execute 'buffer ' .. bufnr(virtual_name)
         return
     endif
 
@@ -52,6 +67,24 @@ export def InitPager()
         delete(chunk)
     endfor
     mkdir(tmp_dir, 'p')
+
+    # Verify sufficient disk space before splitting
+    var file_size = getfsize(filepath)
+    var df_output = systemlist('df -kP ' .. shellescape(tmp_dir))
+
+    if len(df_output) >= 2
+        # df -kP guarantees a single-line output for the drive at the bottom
+        var available_kb = str2nr(split(df_output[-1])[3])
+        var required_kb = file_size / 1024
+        var safety_margin_kb = 1 * 1024 * 1024 # 1 GB safety buffer
+
+        if available_kb < required_kb + safety_margin_kb
+            var free_after_mb = FormatNum((available_kb - required_kb) / 1024)
+
+            echoerr 'Disk space too low. Rejecting to chunk file into ' .. prefix .. '* and leave you with ' .. free_after_mb .. ' MB free.'
+            return
+        endif
+    endif
 
     # Split file in chunks using UNIX split
     # Splitting by even memory is way faster than splitting by even lines
@@ -78,8 +111,11 @@ export def InitPager()
         endif
     endfor
 
-    # Create a buffer for our pager view and set variables for record
+    # Create a buffer for our pager view
     enew
+    execute 'file ' .. fnameescape(virtual_name)
+
+    # Set variables for record
     b:pager_prefix = prefix
     b:pager_filepath = filepath
     b:chunk_size = chunk_size
@@ -106,17 +142,20 @@ export def InitPager()
 enddef
 
 export def QuitPager()
+    # FIXME really needed? not visible if not on a pager buffer
     # FIXME check for filetype paginate instead?
     if !exists('b:pager_filepath')
         return
     endif
 
     var target_line = exists('b:pager_offset') ? line('.') + b:pager_offset : line('.')
-    var filepath = b:pager_filepath
+    var pager_buf = bufnr('%')
 
     # Open the original file in the current window
-    # Because we use bufhidden=wipe, this replaces the pager and triggers CleanupPager
-    execute 'edit ' .. fnameescape(filepath)
+    execute 'edit ' .. fnameescape(b:pager_filepath)
+
+    # Explicitly wipe the pager buffer to trigger the cleanup autocommand
+    execute 'bwipeout ' .. pager_buf
 
     # FIXME recover column too
     cursor(target_line, 1)
@@ -124,14 +163,28 @@ export def QuitPager()
     echom 'Pager closed. The full file is now loaded natively and is editable.'
 enddef
 
-# FIXME Do not need the prefix, since the variable is buffer-local
-# FIXME Get rid of needing to press Enter after all these messages
-export def CleanupPager(prefix: string)
+export def CleanupPager(target_prefix: string = '')
+    var prefix = target_prefix != '' ? target_prefix : get(b:, 'pager_prefix', '')
+    if empty(prefix)
+        return
+    endif
+
     var chunk_files = glob(prefix .. '*', 1, 1)
     for file in chunk_files
         delete(file)
     endfor
-    echom 'Pager cleaned up. Temporary chunks removed.'
+enddef
+
+export def CleanupAllPagers()
+    for i in range(1, bufnr('$'))
+        if bufexists(i) && getbufvar(i, '&filetype') == 'paginate'
+            var prefix = getbufvar(i, 'pager_prefix', '')
+            if !empty(prefix)
+                CleanupPager(prefix)
+            endif
+            silent! execute 'bwipeout! ' .. i
+        endif
+    endfor
 enddef
 
 # =============================================================================

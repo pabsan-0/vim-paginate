@@ -7,10 +7,10 @@ b:did_ftplugin = 1
 
 import '../autoload/paginate.vim' as paginate
 
-setlocal statusline=%t\ %=\ Line\ %{paginate#GetPagerRealLineFormatted()}\ /\ %{b:pager_total_formatted}\ (Chunk\ view\ %{b:current_chunk_idx})
+setlocal statusline=%f\ %=\ Line\ %{paginate#GetPagerRealLineFormatted()}\ /\ %{b:pager_total_formatted}\ (Chunk\ view\ %{b:current_chunk_idx})
 
 setlocal buftype=nofile
-setlocal bufhidden=wipe
+setlocal bufhidden=hide
 setlocal noswapfile
 setlocal undolevels=-1
 setlocal ignorecase
@@ -19,8 +19,7 @@ setlocal smartcase
 augroup PaginateBufferAutocmds
     autocmd! * <buffer>
     autocmd CursorMoved <buffer> call paginate.CheckBoundaries()
-    autocmd ExitPre <buffer> if exists('b:pager_prefix') | call paginate.CleanupPager(b:pager_prefix) | endif
-    autocmd BufWipeout <buffer> if exists('b:pager_prefix') | call paginate.CleanupPager(b:pager_prefix) | endif
+    autocmd BufWipeout  <buffer> call paginate.CleanupPager()
 augroup END
 
 command! -buffer -nargs=1 J call paginate.GoToRealLine(str2nr(<q-args>))
