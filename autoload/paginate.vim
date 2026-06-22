@@ -46,8 +46,8 @@ def InstallPagerUI()
 
     augroup PaginateBufferAutocmds
         autocmd! * <buffer>
-        autocmd CursorMoved <buffer> call CheckBoundaries()
-        autocmd BufWipeout  <buffer> call CleanupPager()
+        autocmd CursorMoved <buffer> call paginate#CheckBoundaries()
+        autocmd BufWipeout  <buffer> call paginate#CleanupPager()
     augroup END
 
     command! -buffer -nargs=1 J call GoToRealLine(str2nr(<q-args>))
