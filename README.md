@@ -37,13 +37,13 @@ curl -fsSL https://raw.githubusercontent.com/pabsan-0/vim-paginate/master/instal
 
 Pagination commands:
 
-| Command         | Scope  | Action                                                                    |
-| ---             | ---    | ---                                                                       |
-| `:PagerInit`    | Global | "Chunk the current file, dump it to /tmp, and open the pager view"        |
-| `:PagerFreeAll` | Global | Forcefully wipe all hidden pager buffers and delete all /tmp files        |
-| `:PagerQuit`    | Buffer | "Destroy the pager, delete its temp files, and native-edit the real file" |
-| `:PagerInfo`    | Buffer | "Print debug information (offsets, chunk lines, file sizes, etc.)"        |
-| `:J {line}`     | Buffer | Jump to an absolute line (equivalent to {line}G)                          |
+| Command         | Scope  | Action                                                                  |
+| ---             | ---    | ---                                                                     |
+| `:PagerInit`    | Global | Chunk the current file into /tmp and open the pager view                |
+| `:PagerFreeAll` | Global | Forcefully wipe all hidden pager buffers and delete all /tmp files      |
+| `:PagerQuit`    | Buffer | Destroy the pager, delete its temp files, and native-edit the real file |
+| `:PagerInfo`    | Buffer | Print debug information (offsets, chunk lines, file sizes, etc.)        |
+| `:J {line}`     | Buffer | Jump to an absolute line (equivalent to {line}G)                        |
 
 Hijacked mappings that override default Vim bahavior:
 
