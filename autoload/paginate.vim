@@ -97,6 +97,10 @@ def InstallPagerUI()
     nnoremap <buffer> <silent> [c <ScriptCmd>GetBoundaryStart(v:true)<CR>
     nnoremap <buffer> <silent> ]c <ScriptCmd>GetBoundaryEnd(v:true)<CR>
 
+    # Dummy iface
+    nnoremap <buffer> <silent> <Down>  <ScriptCmd>MoveUpDown(v:true, v:count)<CR>
+    nnoremap <buffer> <silent> <Up>  <ScriptCmd>MoveUpDown(v:false, v:count)<CR>
+
     b:paginate = true
 enddef
 
