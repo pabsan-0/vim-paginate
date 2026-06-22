@@ -45,7 +45,7 @@ export def InitPager()
     var original_line = line('.')
     var filepath = expand('%:p')
     if empty(filepath)
-        echoerr 'No file currently loaded.'
+        echoerr 'No file currently loaded. Are you on a scratch buffer?'
         return
     endif
 
@@ -58,7 +58,7 @@ export def InitPager()
     # Setup temporary directory to dump file chunks
     var dirname = fnamemodify(filepath, ':h')
     var filename = fnamemodify(filepath, ':t')
-    var tmp_dir = '/tmp/vim-pager' .. dirname
+    var tmp_dir = '/tmp/vim-paginate' .. dirname
     var prefix = tmp_dir .. '/' .. filename .. '.parts_'
 
     # Purge existing chunks from a previous execution / mkdir
@@ -231,6 +231,11 @@ enddef
 # FIXME rename to CheckShiftBoundaries
 # FIXME TEST surgically change boundary and verify the chunks change
 export def CheckBoundaries()
+    # Skip if in visual mode
+    if mode() =~# '^[vV\x16]'
+        return
+    endif
+
     var current_line = line('.')
     var total_lines = line('$')
     var visual_margin = winheight(0) * 3
