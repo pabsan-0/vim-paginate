@@ -34,8 +34,73 @@ enddef
 # Initialization and Quitting
 # =============================================================================
 
+def InstallPagerUI()
+    setlocal statusline=%f\ %=\ Line\ %{paginate#GetPagerRealLineFormatted()}\ /\ %{b:pager_total_formatted}\ (Chunk\ view\ %{b:current_chunk_idx})
+
+    setlocal buftype=nofile
+    setlocal bufhidden=hide
+    setlocal noswapfile
+    setlocal undolevels=-1
+    setlocal ignorecase
+    setlocal smartcase
+
+    augroup PaginateBufferAutocmds
+        autocmd! * <buffer>
+        autocmd CursorMoved <buffer> call CheckBoundaries()
+        autocmd BufWipeout  <buffer> call CleanupPager()
+    augroup END
+
+    command! -buffer -nargs=1 J call GoToRealLine(str2nr(<q-args>))
+    command! -buffer -nargs=0 PagerInfo call ShowPagerInfo()
+    command! -buffer -nargs=0 PagerQuit call QuitPager()
+
+    nnoremap <buffer> <silent> j  <ScriptCmd>MoveUpDown(v:true, v:count)<CR>
+    nnoremap <buffer> <silent> k  <ScriptCmd>MoveUpDown(v:false, v:count)<CR>
+
+    nnoremap <buffer> <silent> gg <ScriptCmd>GoToRealLine(1)<CR>
+    nnoremap <buffer> <silent> G  <ScriptCmd>GoToRealLine(v:count)<CR>
+    nnoremap <buffer> <silent> /  <ScriptCmd>PromptSearch(v:true)<CR>
+    nnoremap <buffer> <silent> ?  <ScriptCmd>PromptSearch(v:false)<CR>
+    nnoremap <buffer> <silent> n  <ScriptCmd>RepeatSearch(v:true)<CR>
+    nnoremap <buffer> <silent> N  <ScriptCmd>RepeatSearch(v:false)<CR>
+
+    nnoremap <buffer> <silent> *  <ScriptCmd>SearchUnderCursor(v:true, v:false)<CR>
+    nnoremap <buffer> <silent> g* <ScriptCmd>SearchUnderCursor(v:true, v:true)<CR>
+    nnoremap <buffer> <silent> #  <ScriptCmd>SearchUnderCursor(v:false, v:false)<CR>
+    nnoremap <buffer> <silent> g# <ScriptCmd>SearchUnderCursor(v:false, v:true)<CR>
+
+    xnoremap <buffer> <silent> *  <ScriptCmd>SearchUnderCursorVisual(v:true, v:false)<CR>
+    xnoremap <buffer> <silent> g* <ScriptCmd>SearchUnderCursorVisual(v:true, v:true)<CR>
+    xnoremap <buffer> <silent> #  <ScriptCmd>SearchUnderCursorVisual(v:false, v:false)<CR>
+    xnoremap <buffer> <silent> g# <ScriptCmd>SearchUnderCursorVisual(v:false, v:true)<CR>
+
+    nnoremap <buffer> <silent> g/ <ScriptCmd>PromptSearch(v:true, v:true)<CR>
+    nnoremap <buffer> <silent> g? <ScriptCmd>PromptSearch(v:false, v:true)<CR>
+
+    nnoremap <buffer> <silent> <C-f> <ScriptCmd>MoveUpDown(v:true, winheight(0))<CR>
+    nnoremap <buffer> <silent> <C-b> <ScriptCmd>MoveUpDown(v:false, winheight(0))<CR>
+    nnoremap <buffer> <silent> <C-d> <ScriptCmd>MoveUpDown(v:true, winheight(0) / 2)<CR>
+    nnoremap <buffer> <silent> <C-u> <ScriptCmd>MoveUpDown(v:false, winheight(0) / 2)<CR>
+
+    nnoremap <buffer> <silent> m <ScriptCmd>SetMark(getcharstr())<CR>
+    nnoremap <buffer> <silent> ' <ScriptCmd>JumpMark(v:false, getcharstr())<CR>
+    nnoremap <buffer> <silent> ` <ScriptCmd>JumpMark(v:true, getcharstr())<CR>
+
+    nnoremap <buffer> <silent> <C-o> <ScriptCmd>NavigateJump(v:true)<CR>
+    nnoremap <buffer> <silent> <C-i> <ScriptCmd>NavigateJump(v:false)<CR>
+
+    nnoremap <buffer> <silent> `` <ScriptCmd>NavigateJump(v:true)<CR>
+    nnoremap <buffer> <silent> '' <ScriptCmd>NavigateJump(v:true)<CR>
+    nnoremap <buffer> <silent> gv <ScriptCmd>RestoreVisualState()<CR>
+
+    nnoremap <buffer> <silent> [c <ScriptCmd>GetBoundaryStart(v:true)<CR>
+    nnoremap <buffer> <silent> ]c <ScriptCmd>GetBoundaryEnd(v:true)<CR>
+
+    b:paginate = true
+enddef
+
 export def InitPager()
-    if &filetype == 'paginate'
+    if get(b:, "paginate", false)
         echoerr 'This buffer is already a pager.'
         return
     endif
@@ -97,7 +162,6 @@ export def InitPager()
 
     # Index the lines where the splits just happened
     # First run wc on every chunk, verify sane output, then add lines
-    # FIXME one-off error when pressing G
     echom 'Counting lines && indexing chunk lines...'
     var total_lines = 0
     var chunk_lines: list<number> = []
@@ -125,10 +189,10 @@ export def InitPager()
     b:current_chunk_idx = 0
     b:pager_offset = 0
 
-    # Load the first chunks view and assign the Paginate filetype
+    # Load the first chunks view and install UI
     LoadChunks(0)
     GoToRealLine(original_line)
-    setlocal filetype=paginate
+    InstallPagerUI()
 
     # Delete the original buffer. Not awesome but covers a relevant edge case:
     #  Typically, when opening a very large file that you're going to paginate
@@ -142,12 +206,6 @@ export def InitPager()
 enddef
 
 export def QuitPager()
-    # FIXME really needed? not visible if not on a pager buffer
-    # FIXME check for filetype paginate instead?
-    if !exists('b:pager_filepath')
-        return
-    endif
-
     var target_line = exists('b:pager_offset') ? line('.') + b:pager_offset : line('.')
     var pager_buf = bufnr('%')
 
@@ -177,7 +235,7 @@ enddef
 
 export def CleanupAllPagers()
     for i in range(1, bufnr('$'))
-        if bufexists(i) && getbufvar(i, '&filetype') == 'paginate'
+        if bufexists(i) && getbufvar(i, 'paginate', false)
             var prefix = getbufvar(i, 'pager_prefix', '')
             if !empty(prefix)
                 CleanupPager(prefix)
@@ -229,7 +287,6 @@ def LoadChunks(start_chunk_idx: number)
 enddef
 
 # FIXME rename to CheckShiftBoundaries
-# FIXME TEST surgically change boundary and verify the chunks change
 export def CheckBoundaries()
     # Skip if in visual mode
     if mode() =~# '^[vV\x16]'
@@ -431,10 +488,6 @@ export def PromptSearch(forward: bool, inverse: bool = v:false)
     ExecuteSearch(forward, inverse)
 enddef
 
-# FIXME This is for asterisk. Add a visual variant here.
-# FIXME Add reverse search with #
-# FIXME Add inverse search with g*
-# FIXME Add reverse inverse search with g#
 export def SearchUnderCursor(forward: bool, inverse: bool)
     var word = expand('<cword>')
     echom "*# searching " .. word
@@ -497,7 +550,6 @@ export def RepeatSearch(forward: bool)
     ExecuteSearch(is_forward, is_inverse)
 enddef
 
-# FIXME: refactor into smaller functions
 # FIXME: phase 4 could be done with ripgrep, worth it?
 # FIXME: substitute-count commands should work over the whole file
 export def ExecuteSearch(forward: bool, inverse: bool = v:false)
