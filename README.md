@@ -21,6 +21,12 @@ filetype plugin on
 Plug 'pabsan-0/vim-paginate'
 ```
 
+Users that don't want to maintain their own vim environment can also install a portable version with:
+
+```
+curl -fsSL https://raw.githubusercontent.com/pabsan-0/vim-paginate/master/install.sh | bash
+```
+
 ## Quick start
 
 - Open a large file normally. Feel free to interrupt loading with `^C`
