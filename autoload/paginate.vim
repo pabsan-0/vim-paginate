@@ -48,6 +48,7 @@ def InstallPagerUI()
         autocmd! * <buffer>
         autocmd CursorMoved <buffer> call paginate#CheckBoundaries()
         autocmd BufWipeout  <buffer> call paginate#CleanupPager()
+        autocmd BufDelete   <buffer> call paginate#CleanupPager()
     augroup END
 
     command! -buffer -nargs=1 J call GoToRealLine(str2nr(<q-args>))
@@ -222,7 +223,7 @@ export def QuitPager()
 enddef
 
 export def CleanupPager(target_prefix: string = '')
-    var prefix = target_prefix != '' ? target_prefix : get(b:, 'pager_prefix', '')
+    var prefix = target_prefix != '' ? target_prefix : getbufvar(str2nr(expand('<abuf>')), 'pager_prefix', '')
     if empty(prefix)
         return
     endif
